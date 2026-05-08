@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     twitter_api_key: str = ""
     twitter_api_secret: str = ""
     twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
 
     # Gmail
     gmail_user: str = ""

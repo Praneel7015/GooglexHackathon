@@ -5,9 +5,9 @@ from .contracts import (
     SubmissionIntegration,
     SubmissionPayload,
 )
-from .gmail import GmailConfig, GmailIntegration
-from .twitter import TwitterConfig, TwitterIntegration
-from .whatsapp import WhatsAppConfig, WhatsAppIntegration
+from .gmail import GmailIntegration
+from .twitter import TwitterIntegration
+from .whatsapp import WhatsAppIntegration
 
 __all__ = [
     "DeliveryResult",
@@ -15,10 +15,7 @@ __all__ = [
     "RetryPolicy",
     "SubmissionIntegration",
     "SubmissionPayload",
-    "GmailConfig",
     "GmailIntegration",
-    "TwitterConfig",
     "TwitterIntegration",
-    "WhatsAppConfig",
     "WhatsAppIntegration",
 ]

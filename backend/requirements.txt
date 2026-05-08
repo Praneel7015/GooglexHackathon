@@ -8,5 +8,6 @@ httpx
 python-dotenv
 pydantic-settings
 pillow
+tweepy
 pytest
 pytest-asyncio

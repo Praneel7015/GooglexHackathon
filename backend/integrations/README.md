@@ -1,54 +1,87 @@
-# Submission Integrations (Portable Module)
+# Submission Integrations
 
-This module is intentionally self-contained so it can be plugged into any FastAPI/service layer once the core app foundation is ready.
+## Setup
 
-## Provided adapters
+### Twitter (@nammacity_blr)
+1. Create a Twitter/X developer account at developer.twitter.com
+2. Apply for free tier (500 tweets/month)
+3. Create an app, get all 4 OAuth 1.0a keys
+4. Add to `.env`:
+   ```
+   TWITTER_API_KEY=...
+   TWITTER_API_SECRET=...
+   TWITTER_ACCESS_TOKEN=...
+   TWITTER_ACCESS_TOKEN_SECRET=...
+   ```
 
-- `TwitterIntegration` (`twitter.py`)
-- `GmailIntegration` (`gmail.py`)
-- `WhatsAppIntegration` (`whatsapp.py`)
+### Gmail (complaints@nammacity.in)
+1. Create a Google account for NammaCity
+2. Enable 2-Factor Authentication
+3. Generate an App Password at myaccount.google.com/apppasswords
+4. Add to `.env`:
+   ```
+   GMAIL_USER=complaints@nammacity.in
+   GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+   ```
 
-## Shared contracts
+### WhatsApp
+Stubbed for hackathon. Meta Business API approval takes weeks.
+No env vars needed — all calls return `mode: stub`.
 
-- `SubmissionPayload`
-- `DeliveryResult`
-- `DeliveryStatus`
-- `RetryPolicy`
-- `SubmissionIntegration` protocol
+## Email User-Attribution Model (CRITICAL)
 
-All contracts are defined in `contracts.py`.
+NammaCity drives the send (zero user friction) but BBMP sees and
+replies to the actual citizen:
 
-## Usage with submission service
-
-```python
-from agents.submission import SubmissionService
-from integrations.gmail import GmailConfig, GmailIntegration
-from integrations.twitter import TwitterConfig, TwitterIntegration
-from integrations.whatsapp import WhatsAppConfig, WhatsAppIntegration
-from integrations.contracts import SubmissionPayload
-
-service = SubmissionService(
-    integrations=[
-        TwitterIntegration(TwitterConfig(dry_run=True)),
-        GmailIntegration(GmailConfig(dry_run=True)),
-        WhatsAppIntegration(WhatsAppConfig(dry_run=True)),
-    ]
-)
-
-payload = SubmissionPayload(
-    complaint_id="cmp-001",
-    correlation_id="corr-001",
-    subject="Pothole near MSRIT gate",
-    body_text="Large pothole causing traffic slowdown.",
-    recipients=["ward.officer@example.com"],
-    metadata={"whatsapp_contacts": ["+919999999999"]},
-)
-
-summary = await service.submit(payload)
+```
+From: NammaCity <complaints@nammacity.in>     ← always our address
+To: ward95@bbmp.gov.in                        ← BBMP officer
+Cc: citizen@gmail.com                         ← the citizen (optional)
+Reply-To: citizen@gmail.com                   ← BBMP replies go here
+Body: "Submitted by: Citizen Name <citizen@gmail.com>"
 ```
 
-## Portability choices
+If citizen doesn't provide email: complaint sends from NammaCity only,
+no Cc, no Reply-To override. Pipeline still works.
 
-- Uses Python stdlib networking (`urllib`, `smtplib`) to avoid extra dependency coupling.
-- Every adapter supports `dry_run=True` for local testing and demo mode.
-- All integrations are async-friendly (`asyncio.to_thread` for blocking operations).
+## API Reference
+
+### TwitterIntegration
+```python
+twitter = TwitterIntegration()  # reads from config.settings
+result = await twitter.send(payload)
+# result: DeliveryResult { status, provider_message_id, external_ref, mode }
+```
+- STUB when credentials missing (returns fake URL)
+- LIVE posts via tweepy OAuth 1.0a
+- Auto-truncates to 280 chars
+- Rate limit: 500 tweets/month (free tier)
+
+### GmailIntegration
+```python
+gmail = GmailIntegration()  # reads from config.settings
+result = await gmail.send(
+    payload,
+    cc="citizen@gmail.com",          # citizen's email
+    reply_to="citizen@gmail.com",    # BBMP replies go to citizen
+    bcc="records@nammacity.in",      # optional internal copy
+)
+# result: DeliveryResult { status, provider_message_id, mode }
+```
+- STUB when credentials missing
+- LIVE sends via smtp.gmail.com:587 STARTTLS
+- Supports HTML + plain text body
+- Rate limit: 500 emails/day (free Gmail)
+
+### WhatsAppIntegration
+```python
+wa = WhatsAppIntegration()
+result = await wa.send(payload)
+# Always returns mode='stub'
+```
+
+## For the Submission Agent (next phase)
+- Call all three clients in parallel via asyncio.gather
+- Each returns DeliveryResult with success/error/mode fields
+- Pipeline must NOT crash if a client fails
+- For email: pass citizen's email as `cc` AND `reply_to` when available
