@@ -85,7 +85,9 @@ async def _run_agent_once(
         new_message=message,
     ):
         if event.is_final_response() and event.content and event.content.parts:
-            response_text = event.content.parts[0].text or ""
+            response_text = "".join(
+                part.text for part in event.content.parts if getattr(part, "text", None)
+            )
 
     return response_text
 
