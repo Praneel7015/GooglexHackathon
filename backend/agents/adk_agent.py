@@ -1,11 +1,11 @@
 """
-Google ADK integration layer for NammaCity.
-Wraps the complaint pipeline as ADK FunctionTools under a central LlmAgent.
+Google ADK orchestrator agent for NammaCity.
+Exposes the full complaint pipeline as ADK FunctionTools under a central LlmAgent.
+Each tool delegates to the corresponding ADK-native NammaCity agent.
 """
 
-import asyncio
-import json
 import logging
+import os
 from typing import Any
 
 from google.adk import Runner
@@ -27,8 +27,12 @@ from config import settings
 
 logger = logging.getLogger("nammacity.adk")
 
+# ADK requires GOOGLE_API_KEY — map from GEMINI_API_KEY at import time
+if settings.gemini_api_key and not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Agent singletons (shared with main.py via import)
+# Agent singletons — each is an ADK-native NammaCity agent
 # ─────────────────────────────────────────────────────────────────────────────
 
 _reporter = ReporterAgent()
@@ -41,19 +45,16 @@ _escalation = EscalationAgent()
 _prediction = PredictionAgent()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Tool functions (each wraps one NammaCity agent)
-# ADK FunctionTools must be synchronous or async plain functions.
+# FunctionTool wrappers — each calls the ADK-native agent and returns its data
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def classify_civic_issue(
     issue_description: str,
     ward_number: int | None = None,
-    severity_hint: int | None = None,
 ) -> dict[str, Any]:
     """
     Classify a civic issue from a text description.
     Returns issue_type, severity (1-5), and spam_score.
-    Use this when you have a description but no photo bytes available.
     """
     result = await _reporter.execute(AgentInput(data={
         "photo_bytes": b"",
@@ -66,8 +67,7 @@ async def classify_civic_issue(
 async def route_complaint(issue_type: str, ward_number: int | None = None) -> dict[str, Any]:
     """
     Route a civic complaint to the correct agency.
-    Given an issue_type (e.g. 'pothole', 'water_leak') and optional ward number,
-    returns the primary agency, secondary agency, and ward officer contact.
+    Returns primary_agency, secondary_agency, ward_officer, and twitter_handle.
     """
     result = await _routing.execute(AgentInput(data={
         "issue_type": issue_type,
@@ -86,7 +86,7 @@ async def check_crowd_validation(
 ) -> dict[str, Any]:
     """
     Check whether a new complaint can be bundled with similar nearby ones.
-    Returns is_bundled (bool), member_count, cluster_id, and aggregated_description.
+    Returns is_bundled, member_count, cluster_id, and aggregated_description.
     Bundling amplifies civic pressure — 38 complaints get fixed, 1 gets ignored.
     """
     result = await _crowd.execute(AgentInput(data={
@@ -116,8 +116,8 @@ async def draft_complaint_content(
 ) -> dict[str, Any]:
     """
     Generate formal complaint content in multiple formats simultaneously.
-    Returns: email_subject, email_body_en, email_body_kn (Kannada), tweet_text,
-    whatsapp_text, and rti_template (RTI application under Karnataka RTI Act).
+    Returns email_subject, email_body_en, email_body_kn, tweet_text,
+    whatsapp_text, and rti_template.
     """
     result = await _drafting.execute(AgentInput(data={
         "complaint_id": complaint_id,
@@ -154,8 +154,7 @@ async def submit_complaint(
 ) -> dict[str, Any]:
     """
     Dispatch the complaint across Twitter, Gmail, and WhatsApp simultaneously.
-    Returns per-channel status (success/failed/stub), reference IDs, and overall status.
-    Applies milestone suppression for bundled complaints.
+    Returns per-channel status, reference IDs, and overall submission status.
     """
     result = await _submission.execute(AgentInput(data={
         "complaint_id": complaint_id,
@@ -184,9 +183,8 @@ async def predict_resolution(
     issue_type: str | None = None,
 ) -> dict[str, Any]:
     """
-    Predict the likelihood and timeline for a civic complaint to be resolved.
-    Returns resolution_rate, avg_resolution_days, and a confidence_message like
-    '72% chance of resolution in ~18 days based on Ward 95 history'.
+    Predict resolution likelihood and timeline for a civic complaint.
+    Returns resolution_rate, avg_resolution_days, and confidence_message.
     """
     result = await _prediction.execute(AgentInput(data={
         "ward_number": ward_number,
@@ -204,22 +202,26 @@ async def schedule_escalation(
 ) -> dict[str, Any]:
     """
     Schedule the 30-day enforcement ladder for an unresolved complaint.
-    Day 7: ward councillor tagged. Day 14: RTI filed. Day 21: MLA + media.
-    Day 30: PIL outline drafted. Returns the full timeline.
+    Day 7: ward councillor tagged. Day 14: RTI filed.
+    Day 21: MLA + media. Day 30: PIL outline drafted.
     """
     result = await _escalation.execute(AgentInput(data={
         "complaint_id": complaint_id,
-        "complaint": {"id": complaint_id, "issue_type": issue_type, "ward_number": ward_number},
+        "complaint": {
+            "id": complaint_id,
+            "issue_type": issue_type,
+            "ward_number": ward_number,
+        },
         "agency_name": agency_name,
     }))
     return result.data if result.success else {"error": result.error}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ADK LlmAgent — the central NammaCity coordinator
+# Orchestrator LlmAgent instruction
 # ─────────────────────────────────────────────────────────────────────────────
 
-NAMMACITY_INSTRUCTION = """
+_ORCHESTRATOR_INSTRUCTION = """
 You are NammaCity, an AI civic operating system for Bangalore.
 
 Your role is to help citizens report civic issues and automatically escalate them
@@ -245,11 +247,11 @@ For a new complaint, you MUST:
 
 Always be specific about ward numbers, agency names, and timelines.
 Respond in the citizen's language when possible (Kannada, Hindi, or English).
-"""
+""".strip()
 
 
-def build_nammacity_agent() -> LlmAgent:
-    """Build and return the ADK LlmAgent with all NammaCity tools registered."""
+def _build_orchestrator_agent() -> LlmAgent:
+    """Build the central NammaCity orchestrator ADK LlmAgent."""
     tools = [
         FunctionTool(classify_civic_issue),
         FunctionTool(route_complaint),
@@ -259,47 +261,57 @@ def build_nammacity_agent() -> LlmAgent:
         FunctionTool(predict_resolution),
         FunctionTool(schedule_escalation),
     ]
-
     agent = LlmAgent(
         name="nammacity_orchestrator",
-        model=f"google/{settings.gemini_model}" if hasattr(settings, "gemini_model") else "gemini-2.5-flash",
+        model="gemini-2.5-flash",
         description="NammaCity civic AI — routes, bundles, and escalates Bangalore complaints",
-        instruction=NAMMACITY_INSTRUCTION,
+        instruction=_ORCHESTRATOR_INSTRUCTION,
         tools=tools,
     )
-    logger.info("ADK LlmAgent 'nammacity_orchestrator' built with %d tools", len(tools))
+    logger.info("ADK orchestrator LlmAgent built with %d tools", len(tools))
     return agent
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ADK Runner — executes the agent for a single complaint description query
+# Singletons — built once per process, reused across all requests
+# ─────────────────────────────────────────────────────────────────────────────
+
+_session_service = InMemorySessionService()
+_runner = Runner(
+    agent=_build_orchestrator_agent(),
+    app_name="nammacity",
+    session_service=_session_service,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public entry point — used by POST /api/v1/adk/chat
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def run_adk_pipeline(user_message: str, session_id: str = "default") -> str:
     """
-    Run the NammaCity ADK agent for a text-based complaint query.
+    Run the NammaCity orchestrator ADK agent for a text-based complaint query.
     Returns the agent's final text response.
-    Used by chat-style or voice-note-transcription flows.
     """
-    agent = build_nammacity_agent()
-    session_service = InMemorySessionService()
-
-    runner = Runner(
-        agent=agent,
-        app_name="nammacity",
-        session_service=session_service,
-    )
-
-    session = await session_service.create_session(
-        app_name="nammacity",
-        user_id="citizen",
-        session_id=session_id,
-    )
+    try:
+        session = await _session_service.get_session(
+            app_name="nammacity",
+            user_id="citizen",
+            session_id=session_id,
+        )
+        if session is None:
+            raise ValueError("session not found")
+    except Exception:
+        session = await _session_service.create_session(
+            app_name="nammacity",
+            user_id="citizen",
+            session_id=session_id,
+        )
 
     message = Content(role="user", parts=[Part(text=user_message)])
 
     final_response = ""
-    async for event in runner.run_async(
+    async for event in _runner.run_async(
         user_id="citizen",
         session_id=session.id,
         new_message=message,

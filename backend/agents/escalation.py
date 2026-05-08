@@ -1,14 +1,17 @@
 """
 Escalation Agent — 30-day enforcement ladder for unresolved complaints.
 Generates day 0/7/14/21/30 actions and persists them in the escalations table.
+All draft generation runs in parallel via ADK adk_client.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Callable, Awaitable
 from uuid import uuid4
 
+from agents.adk_client import generate_text
 from agents.base import AgentInput, AgentOutput, BaseAgent
-from agents.gemini_client import generate_text
 from db.client import get_client as get_supabase
 
 logger = logging.getLogger("nammacity.agents.escalation")
@@ -50,65 +53,94 @@ ESCALATION_LADDER: list[dict] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Draft generators (one per ladder rung)
+# Draft generators — each returns prompt text only; generation is parallelised
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _draft_councillor_tweet(complaint: dict) -> str:
-    prompt = (
+def _councillor_tweet_prompt(c: dict) -> str:
+    ward = c.get("ward_number", "N/A")
+    ward_name = c.get("ward_name", "")
+    issue = (c.get("issue_type") or "civic issue").replace("_", " ")
+    agency = c.get("agency_name") or "BBMP"
+    cid = c["id"]
+    return (
         f"Write a firm escalation tweet (max 270 chars). Tone: assertive, cite lack of response.\n"
-        f"Issue: {complaint['issue_type'].replace('_',' ')} in Ward {complaint['ward_number']} "
-        f"({complaint.get('ward_name','')}).\n"
-        f"Agency: {complaint.get('agency_name','BBMP')}.\n"
-        f"Complaint ID: {complaint['id']}.\n"
+        f"Issue: {issue} in Ward {ward}"
+        + (f" ({ward_name})" if ward_name else "")
+        + f".\nAgency: {agency}. Complaint ID: {cid}.\n"
         f"Start with: @BBMPCOMM @CMofKarnataka\n"
-        f"End with: #FixBangalore nammacity.in/c/{complaint['id']}\n"
+        f"End with: #FixBangalore nammacity.in/c/{cid}\n"
         f"Output ONLY the tweet text."
     )
-    return (await generate_text(prompt)).strip()[:280]
 
 
-async def _draft_rti(complaint: dict) -> str:
-    prompt = (
-        f"Draft a short RTI application under Karnataka RTI Act for:\n"
-        f"Issue: {complaint['issue_type'].replace('_',' ')} at Ward {complaint['ward_number']}, "
-        f"{complaint.get('address','Bangalore')}.\n"
-        f"Reference: NammaCity #{complaint['id']}.\n"
+def _rti_prompt(c: dict) -> str:
+    ward = c.get("ward_number", "N/A")
+    issue = (c.get("issue_type") or "civic issue").replace("_", " ")
+    address = c.get("address") or "Bangalore"
+    cid = c["id"]
+    return (
+        f"Draft a short RTI application under Karnataka RTI Act.\n"
+        f"Issue: {issue} at Ward {ward}, {address}.\n"
+        f"Reference: NammaCity #{cid}.\n"
         f"Request: action-taken report, responsible officer, expected timeline.\n"
         f"Keep it under 200 words. Include RTI Act Section 6 citation."
     )
-    return await generate_text(prompt)
 
 
-async def _draft_mla_tweet(complaint: dict) -> str:
-    prompt = (
+def _mla_tweet_prompt(c: dict) -> str:
+    ward = c.get("ward_number", "N/A")
+    issue = (c.get("issue_type") or "civic issue").replace("_", " ")
+    cid = c["id"]
+    return (
         f"Write an escalation tweet tagging MLA and media (max 270 chars).\n"
-        f"Issue unresolved for 21 days: {complaint['issue_type'].replace('_',' ')} "
-        f"in Ward {complaint['ward_number']}.\n"
+        f"Issue unresolved for 21 days: {issue} in Ward {ward}.\n"
         f"Start with: @CMofKarnataka @TimesofIndia_blr @DeccanHerald\n"
-        f"End with: #FixBangalore #BangaloreCorruption nammacity.in/c/{complaint['id']}\n"
+        f"End with: #FixBangalore #BangaloreCorruption nammacity.in/c/{cid}\n"
         f"Output ONLY the tweet text."
     )
-    return (await generate_text(prompt)).strip()[:280]
 
 
-async def _draft_pil_outline(complaint: dict) -> str:
-    prompt = (
+def _pil_prompt(c: dict) -> str:
+    ward = c.get("ward_number", "N/A")
+    issue = (c.get("issue_type") or "civic issue").replace("_", " ")
+    cid = c["id"]
+    return (
         f"Draft a 150-word PIL outline for filing in Karnataka High Court.\n"
-        f"Civic issue: {complaint['issue_type'].replace('_',' ')} at Ward {complaint['ward_number']}, "
-        f"Bangalore. Unresolved for 30+ days despite formal RTI.\n"
+        f"Civic issue: {issue} at Ward {ward}, Bangalore. "
+        f"Unresolved for 30+ days despite formal RTI.\n"
+        f"Reference: NammaCity #{cid}.\n"
         f"Cite: Article 21 (right to life), Karnataka Municipal Corporations Act 1976.\n"
         f"Include: prayer, petitioner description, relief sought."
     )
-    return await generate_text(prompt)
 
 
-_DRAFT_FUNCS = {
-    "initial": None,  # handled by SubmissionAgent
-    "councillor_tag": _draft_councillor_tweet,
-    "rti": _draft_rti,
-    "mla_media": _draft_mla_tweet,
-    "pil": _draft_pil_outline,
+# Maps action → prompt builder function
+_PROMPT_BUILDERS: dict[str, Callable[[dict], str]] = {
+    "councillor_tag": _councillor_tweet_prompt,
+    "rti":            _rti_prompt,
+    "mla_media":      _mla_tweet_prompt,
+    "pil":            _pil_prompt,
 }
+
+# Char limits per action for tweet-type outputs
+_TWEET_ACTIONS = {"councillor_tag", "mla_media"}
+
+
+async def _generate_draft(action: str, complaint: dict) -> str | None:
+    """Generate a single escalation draft. Returns None for 'initial' rung."""
+    builder = _PROMPT_BUILDERS.get(action)
+    if builder is None:
+        return None
+    try:
+        text = await generate_text(builder(complaint))
+        # Truncate tweet-style outputs to platform limit
+        if action in _TWEET_ACTIONS:
+            text = text.strip()[:280]
+        return text
+    except Exception as e:
+        logger.warning("Draft generation failed for action=%s: %s", action, e)
+        rung = next((r for r in ESCALATION_LADDER if r["action"] == action), {})
+        return f"[Draft pending — {rung.get('label', action)}]"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,7 +150,8 @@ _DRAFT_FUNCS = {
 class EscalationAgent(BaseAgent):
     """
     Plans and persists the full 30-day escalation ladder for a complaint.
-    Call once after submission; each rung is scheduled for future execution.
+    All draft generation is parallelised. Each rung is idempotent via
+    (complaint_id, action) unique key.
     """
 
     def __init__(self) -> None:
@@ -128,8 +161,12 @@ class EscalationAgent(BaseAgent):
         )
 
     async def run(self, agent_input: AgentInput) -> AgentOutput:
-        complaint = agent_input.data.get("complaint", {})
-        complaint_id = complaint.get("id") or agent_input.data.get("complaint_id", "")
+        complaint = agent_input.data.get("complaint") or {}
+        complaint_id: str = (
+            complaint.get("id")
+            or agent_input.data.get("complaint_id")
+            or ""
+        )
         cluster_id: str | None = agent_input.data.get("cluster_id")
 
         if not complaint_id:
@@ -139,77 +176,88 @@ class EscalationAgent(BaseAgent):
                 error="complaint_id is required",
             )
 
-        created_at_raw = complaint.get("created_at")
-        if created_at_raw:
-            try:
-                if isinstance(created_at_raw, str):
-                    created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
-                else:
-                    created_at = created_at_raw
-            except ValueError:
-                created_at = datetime.now(timezone.utc)
-        else:
-            created_at = datetime.now(timezone.utc)
+        # Enrich complaint dict with extra context from agent_input
+        enriched = {
+            **complaint,
+            "id": complaint_id,
+            "ward_name":   agent_input.data.get("ward_name", ""),
+            "address":     agent_input.data.get("address", "Bangalore"),
+            "agency_name": agent_input.data.get("agency_name", "BBMP"),
+        }
 
+        # Parse created_at — default to now (UTC) if missing/invalid
+        created_at = _parse_datetime(complaint.get("created_at"))
+
+        # ── Phase 1: Generate all drafts in parallel ──────────────────────────
+        non_initial_rungs = [r for r in ESCALATION_LADDER if r["action"] != "initial"]
+        draft_tasks = [_generate_draft(r["action"], enriched) for r in non_initial_rungs]
+        drafts_list = await asyncio.gather(*draft_tasks, return_exceptions=True)
+
+        # Map action → draft text (None for exceptions → fallback label)
+        drafts: dict[str, str | None] = {"initial": None}
+        for rung, result in zip(non_initial_rungs, drafts_list):
+            if isinstance(result, Exception):
+                logger.warning("Draft gather exception for %s: %s", rung["action"], result)
+                drafts[rung["action"]] = f"[Draft pending — {rung['label']}]"
+            else:
+                drafts[rung["action"]] = result
+
+        # ── Phase 2: Persist all rungs ────────────────────────────────────────
+        db = get_supabase()  # single client for all inserts
         timeline: list[dict] = []
         inserted = 0
 
         for rung in ESCALATION_LADDER:
+            action = rung["action"]
             scheduled_for = created_at + timedelta(days=rung["day"])
-            idempotency_key = f"{complaint_id}:{rung['action']}"
-
-            # Generate draft for non-initial rungs
-            draft_text: str | None = None
-            draft_fn = _DRAFT_FUNCS.get(rung["action"])
-            if draft_fn:
-                try:
-                    draft_text = await draft_fn({
-                        **complaint,
-                        "id": complaint_id,
-                        "ward_name": agent_input.data.get("ward_name", ""),
-                        "address": agent_input.data.get("address", "Bangalore"),
-                        "agency_name": agent_input.data.get("agency_name", "BBMP"),
-                    })
-                except Exception as e:
-                    logger.warning("Draft generation failed for %s: %s", rung["action"], e)
-                    draft_text = f"[Draft pending — {rung['label']}]"
+            idempotency_key = f"{complaint_id}:{action}"
+            draft_text = drafts.get(action)
+            is_day_zero = rung["day"] == 0
 
             row = {
-                "id": str(uuid4()),
-                "complaint_id": complaint_id,
-                "cluster_id": cluster_id,
-                "day": rung["day"],
-                "action": rung["action"],
-                "status": "sent" if rung["day"] == 0 else "pending",
-                "draft_text": draft_text,
-                "idempotency_key": idempotency_key,
-                "scheduled_for": scheduled_for.isoformat(),
-                "executed_at": datetime.now(timezone.utc).isoformat() if rung["day"] == 0 else None,
+                "id":               str(uuid4()),
+                "complaint_id":     complaint_id,
+                "cluster_id":       cluster_id,
+                "day":              rung["day"],
+                "action":           action,
+                "status":           "sent" if is_day_zero else "pending",
+                "draft_text":       draft_text,
+                "idempotency_key":  idempotency_key,
+                "scheduled_for":    scheduled_for.isoformat(),
+                "executed_at":      datetime.now(timezone.utc).isoformat() if is_day_zero else None,
             }
 
             try:
-                db = get_supabase()
                 db.table("escalations").upsert(row, on_conflict="idempotency_key").execute()
                 inserted += 1
             except Exception as e:
-                logger.warning("Escalation DB insert failed (day %d): %s", rung["day"], e)
+                logger.error(
+                    "Escalation DB upsert failed (complaint=%s day=%d): %s",
+                    complaint_id, rung["day"], e,
+                )
 
             timeline.append({
-                "day": rung["day"],
-                "action": rung["action"],
-                "label": rung["label"],
-                "scheduled_for": scheduled_for.isoformat(),
-                "status": row["status"],
-                "draft_preview": (draft_text or "")[:200] if draft_text else None,
+                "day":            rung["day"],
+                "action":         action,
+                "label":          rung["label"],
+                "scheduled_for":  scheduled_for.isoformat(),
+                "status":         row["status"],
+                "draft_preview":  (draft_text or "")[:200] if draft_text else None,
+                "twitter_targets": rung.get("twitter_targets", []),
             })
+
+        logger.info(
+            "Escalation ladder for %s: %d/%d rungs persisted",
+            complaint_id, inserted, len(ESCALATION_LADDER),
+        )
 
         return AgentOutput(
             agent_name=self.name,
             success=True,
             data={
-                "complaint_id": complaint_id,
+                "complaint_id":     complaint_id,
                 "escalation_count": inserted,
-                "timeline": timeline,
+                "timeline":         timeline,
             },
         )
 
@@ -220,16 +268,35 @@ class EscalationAgent(BaseAgent):
 
 async def get_escalation_timeline(complaint_id: str) -> list[dict]:
     """Return the full escalation timeline for a complaint, ordered by day."""
+    if not complaint_id:
+        return []
     try:
         db = get_supabase()
         result = (
             db.table("escalations")
-            .select("day,action,status,draft_text,scheduled_for,executed_at")
+            .select("day,action,label,status,draft_text,scheduled_for,executed_at,twitter_targets")
             .eq("complaint_id", complaint_id)
             .order("day")
             .execute()
         )
         return result.data or []
     except Exception as e:
-        logger.warning("Timeline fetch failed: %s", e)
+        logger.warning("Timeline fetch failed for %s: %s", complaint_id, e)
         return []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Utilities
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _parse_datetime(value: object) -> datetime:
+    """Parse a datetime from ISO string, datetime object, or fall back to now."""
+    if value is None:
+        return datetime.now(timezone.utc)
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        logger.warning("Could not parse created_at=%r, defaulting to now", value)
+        return datetime.now(timezone.utc)
