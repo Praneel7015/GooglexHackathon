@@ -8,11 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from agents.base import AgentInput
+from agents.crowd_validation import CrowdValidationAgent
+from agents.drafting import DraftingAgent
 from agents.geo import GeoAgent, load_ward_boundaries
 from agents.reporter import ReporterAgent
 from agents.routing import RoutingAgent
+from agents.submission import SubmissionAgent
 from config import settings
 from db.client import insert_complaint
+from integrations.qdrant_client import ensure_collection
 
 AGENTS = [
     "reporter", "geo", "routing", "crowd_validation", "drafting",
@@ -33,12 +37,16 @@ logger = logging.getLogger("nammacity")
 reporter_agent = ReporterAgent()
 geo_agent = GeoAgent()
 routing_agent = RoutingAgent()
+crowd_validation_agent = CrowdValidationAgent()
+drafting_agent = DraftingAgent()
+submission_agent = SubmissionAgent()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("NammaCity backend starting (env=%s)", settings.environment)
     load_ward_boundaries()
+    ensure_collection()
     yield
     logger.info("NammaCity backend shutting down")
 
@@ -93,10 +101,12 @@ async def report(
     language: str = Form("en"),
     fallback_lat: float | None = Form(None),
     fallback_lng: float | None = Form(None),
+    user_name: str | None = Form(None),
+    user_email: str | None = Form(None),
 ) -> dict:
     """
-    Main complaint pipeline: Reporter -> Geo -> Routing -> DB insert.
-    Accepts multipart/form-data with photo and optional voice note.
+    Full complaint pipeline:
+    Reporter -> Geo -> Routing -> DB -> CrowdValidation -> Drafting -> Submission
     """
     photo_bytes = await photo.read()
     voice_bytes = await voice_note.read() if voice_note else None
@@ -111,11 +121,9 @@ async def report(
     )
     if not reporter_result.success:
         return JSONResponse(status_code=500, content={
-            "error": "reporter_failed",
-            "message": reporter_result.error,
+            "error": "reporter_failed", "message": reporter_result.error,
         })
 
-    # Spam check
     if reporter_result.data.get("spam_score", 0) > 0.95:
         return JSONResponse(status_code=422, content={
             "error": "likely_spam",
@@ -133,12 +141,11 @@ async def report(
     )
 
     # --- Step 3: Routing Agent ---
-    routing_input_data = {
-        "issue_type": reporter_result.data["issue_type"],
-        "ward_number": geo_result.data.get("ward_number") if geo_result.success else None,
-    }
     routing_result = await routing_agent.execute(
-        AgentInput(data=routing_input_data)
+        AgentInput(data={
+            "issue_type": reporter_result.data["issue_type"],
+            "ward_number": geo_result.data.get("ward_number") if geo_result.success else None,
+        })
     )
 
     # --- Step 4: Insert complaint into Supabase ---
@@ -148,7 +155,6 @@ async def report(
             primary_agency_id = None
             if routing_result.success:
                 primary_agency_id = routing_result.data.get("primary_agency", {}).get("id")
-
             complaint = await insert_complaint(
                 description=reporter_result.data.get("raw_description", ""),
                 lat=geo_result.data["lat"],
@@ -162,14 +168,70 @@ async def report(
         except Exception as e:
             logger.warning("DB insert failed (non-fatal): %s", e)
 
+    # --- Step 5: Crowd Validation Agent ---
+    crowd_result = None
+    if complaint.get("id") and geo_result.success:
+        crowd_result = await crowd_validation_agent.execute(
+            AgentInput(data={
+                "complaint_id": complaint["id"],
+                "description": reporter_result.data.get("raw_description", ""),
+                "lat": geo_result.data["lat"],
+                "lng": geo_result.data["lng"],
+                "ward_number": geo_result.data.get("ward_number"),
+                "issue_type": reporter_result.data["issue_type"],
+            })
+        )
+
+    crowd_data = crowd_result.data if crowd_result and crowd_result.success else {}
+
+    # --- Step 6: Drafting Agent ---
+    drafting_result = await drafting_agent.execute(
+        AgentInput(data={
+            "complaint_id": complaint.get("id", ""),
+            "issue_type": reporter_result.data["issue_type"],
+            "severity": reporter_result.data["severity"],
+            "description": reporter_result.data.get("raw_description", ""),
+            "location": geo_result.data if geo_result.success else {},
+            "routing": routing_result.data if routing_result.success else {},
+            "crowd_validation": crowd_data,
+            "user_name": user_name,
+            "user_email": user_email,
+        })
+    )
+
+    # --- Step 7: Submission Agent ---
+    submission_result = None
+    if drafting_result.success:
+        submission_result = await submission_agent.execute(
+            AgentInput(data={
+                "complaint_id": complaint.get("id", ""),
+                "drafting": drafting_result.data,
+                "routing": routing_result.data if routing_result.success else {},
+                "crowd_validation": crowd_data,
+                "user_email": user_email,
+            })
+        )
+
+    total_latency = (
+        reporter_result.latency_ms
+        + geo_result.latency_ms
+        + routing_result.latency_ms
+        + (crowd_result.latency_ms if crowd_result else 0)
+        + drafting_result.latency_ms
+        + (submission_result.latency_ms if submission_result else 0)
+    )
+
     return {
         "complaint_id": complaint.get("id"),
         "reporter": reporter_result.data,
         "geo": geo_result.data if geo_result.success else {"error": geo_result.error},
         "routing": routing_result.data if routing_result.success else {"error": routing_result.error},
-        "pipeline_latency_ms": round(
-            reporter_result.latency_ms
-            + geo_result.latency_ms
-            + routing_result.latency_ms, 2
-        ),
+        "crowd_validation": crowd_data or None,
+        "drafting": {
+            "email_subject": drafting_result.data.get("email_subject"),
+            "tweet_text": drafting_result.data.get("tweet_text"),
+            "whatsapp_text": drafting_result.data.get("whatsapp_text"),
+        } if drafting_result.success else {"error": drafting_result.error},
+        "submission": submission_result.data if submission_result and submission_result.success else None,
+        "pipeline_latency_ms": round(total_latency, 2),
     }

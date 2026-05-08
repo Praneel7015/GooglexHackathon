@@ -1,6 +1,6 @@
 """
 Singleton Gemini client for NammaCity.
-Wraps google-genai with retry, timeout, and usage logging.
+Wraps google-genai with auto-fallback to cheaper models on rate limits.
 """
 
 import logging
@@ -8,13 +8,7 @@ import time
 
 from google import genai
 from google.genai import types
-from google.genai.errors import ServerError
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
+from google.genai.errors import ClientError, ServerError
 
 from config import settings
 
@@ -23,6 +17,19 @@ logger = logging.getLogger("nammacity.gemini")
 _client: genai.Client | None = None
 
 DEFAULT_TIMEOUT = 30  # seconds
+
+# Fallback chain: try primary, then cheaper models on 429
+TEXT_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
+
+MULTIMODAL_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
 
 
 def get_client() -> genai.Client:
@@ -47,71 +54,82 @@ def _log_usage(model: str, latency_ms: float, response: object) -> None:
     logger.info("gemini_usage: %s", info)
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(ServerError),
-    reraise=True,
-)
+def _is_rate_limit(exc: Exception) -> bool:
+    """Check if exception is a 429 rate limit error."""
+    return isinstance(exc, ClientError) and "429" in str(exc)
+
+
 async def generate_text(
     prompt: str,
-    model: str = "gemini-2.5-flash",
+    model: str | None = None,
 ) -> str:
-    """Generate text from a prompt. Retries on rate limits."""
+    """Generate text with auto-fallback on rate limits."""
+    chain = [model] if model else TEXT_FALLBACK_CHAIN
     client = get_client()
-    start = time.perf_counter()
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
-        ),
-    )
-    latency = (time.perf_counter() - start) * 1000
-    _log_usage(model, latency, response)
-    return response.text or ""
+    last_error = None
+
+    for m in chain:
+        try:
+            start = time.perf_counter()
+            response = client.models.generate_content(
+                model=m,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
+                ),
+            )
+            latency = (time.perf_counter() - start) * 1000
+            _log_usage(m, latency, response)
+            return response.text or ""
+        except (ClientError, ServerError) as e:
+            last_error = e
+            if _is_rate_limit(e) and m != chain[-1]:
+                logger.warning("Rate limited on %s, falling back to next model", m)
+                continue
+            raise
+
+    raise last_error
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(ServerError),
-    reraise=True,
-)
 async def generate_multimodal(
     prompt: str,
     image_bytes: bytes,
-    model: str = "gemini-2.5-flash",
+    model: str | None = None,
 ) -> str:
-    """Generate text from prompt + image. Retries on rate limits."""
+    """Generate text from prompt + image with auto-fallback on rate limits."""
+    chain = [model] if model else MULTIMODAL_FALLBACK_CHAIN
     client = get_client()
-    start = time.perf_counter()
-
+    last_error = None
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
 
-    response = client.models.generate_content(
-        model=model,
-        contents=[prompt, image_part],
-        config=types.GenerateContentConfig(
-            http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
-        ),
-    )
-    latency = (time.perf_counter() - start) * 1000
-    _log_usage(model, latency, response)
-    return response.text or ""
+    for m in chain:
+        try:
+            start = time.perf_counter()
+            response = client.models.generate_content(
+                model=m,
+                contents=[prompt, image_part],
+                config=types.GenerateContentConfig(
+                    http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
+                ),
+            )
+            latency = (time.perf_counter() - start) * 1000
+            _log_usage(m, latency, response)
+            return response.text or ""
+        except (ClientError, ServerError) as e:
+            last_error = e
+            if _is_rate_limit(e) and m != chain[-1]:
+                logger.warning("Rate limited on %s, falling back to next model", m)
+                continue
+            raise
+
+    raise last_error
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(ServerError),
-    reraise=True,
-)
 async def embed_text(
     text: str,
     model: str = "gemini-embedding-001",
 ) -> list[float]:
-    """Embed text and return the vector. 768 dimensions for gemini-embedding-001."""
+    """Embed text and return the vector. 3072 dimensions for gemini-embedding-001."""
     client = get_client()
     start = time.perf_counter()
     response = client.models.embed_content(
