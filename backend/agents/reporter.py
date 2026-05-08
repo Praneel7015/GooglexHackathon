@@ -7,11 +7,8 @@ detects spam. Uses Gemini structured output.
 import json
 import logging
 
-from google import genai
-from google.genai import types
-
 from agents.base import AgentInput, AgentOutput, BaseAgent
-from agents.gemini_client import get_client, DEFAULT_TIMEOUT
+from agents.gemini_client import generate_multimodal_json, get_client, DEFAULT_TIMEOUT
 
 logger = logging.getLogger("nammacity.agents.reporter")
 
@@ -87,29 +84,22 @@ class ReporterAgent(BaseAgent):
             extra_context=f"CITIZEN VOICE NOTE: {extra_context}" if extra_context else ""
         )
 
-        client = get_client()
-        image_part = types.Part.from_bytes(data=photo_bytes, mime_type="image/jpeg")
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt, image_part],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema={
-                    "type": "object",
-                    "properties": {
-                        "issue_type": {"type": "string"},
-                        "severity": {"type": "integer"},
-                        "spam_score": {"type": "number"},
-                        "description": {"type": "string"},
-                    },
-                    "required": ["issue_type", "severity", "spam_score", "description"],
+        response_text = await generate_multimodal_json(
+            prompt=prompt,
+            image_bytes=photo_bytes,
+            response_schema={
+                "type": "object",
+                "properties": {
+                    "issue_type": {"type": "string"},
+                    "severity": {"type": "integer"},
+                    "spam_score": {"type": "number"},
+                    "description": {"type": "string"},
                 },
-                http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
-            ),
+                "required": ["issue_type", "severity", "spam_score", "description"],
+            },
         )
 
-        result = json.loads(response.text)
+        result = json.loads(response_text)
 
         # Validate issue_type
         if result.get("issue_type") not in ISSUE_TYPES:
@@ -133,21 +123,13 @@ class ReporterAgent(BaseAgent):
         )
 
     async def _transcribe_voice(self, audio_bytes: bytes, language: str) -> str:
-        """Transcribe voice note using Gemini."""
+        """Transcribe voice note using Gemini with fallback."""
         try:
-            client = get_client()
-            audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/webm")
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    f"Transcribe this audio in {language}. Return only the transcription text.",
-                    audio_part,
-                ],
-                config=types.GenerateContentConfig(
-                    http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
-                ),
+            from agents.gemini_client import generate_multimodal
+            return await generate_multimodal(
+                prompt=f"Transcribe this audio in {language}. Return only the transcription text.",
+                image_bytes=audio_bytes,  # reuses the same fallback chain
             )
-            return response.text or ""
         except Exception as e:
             logger.warning("Voice transcription failed: %s", e)
             return ""

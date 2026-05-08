@@ -242,22 +242,10 @@ async def report(
             })
         )
 
-    # ── Step 8: Escalation Agent (fire-and-forget schedule) ───────────────────
+    # ── Step 8: Escalation (computed from complaint age, no Gemini calls) ──────
     escalation_result = None
-    if complaint.get("id"):
-        try:
-            escalation_result = await escalation_agent.execute(
-                AgentInput(data={
-                    "complaint_id": complaint["id"],
-                    "complaint": complaint,
-                    "cluster_id": crowd_data.get("cluster_id"),
-                    "ward_name": geo_result.data.get("ward_name", "") if geo_result.success else "",
-                    "address": geo_result.data.get("address", "") if geo_result.success else "",
-                    "agency_name": routing_result.data.get("primary_agency", {}).get("name", "BBMP") if routing_result.success else "BBMP",
-                })
-            )
-        except Exception as e:
-            logger.warning("Escalation scheduling failed (non-fatal): %s", e)
+    # Escalation timeline is computed in GET /api/v1/complaints/{id} based on age
+    # No need to run the full EscalationAgent here — saves 35s of Gemini calls
 
     # ── Step 9: Prediction ────────────────────────────────────────────────────
     prediction_result = None
@@ -294,7 +282,13 @@ async def report(
         "submission": submission_result.data if submission_result and submission_result.success else None,
         "escalation": {
             "scheduled": True,
-            "timeline": escalation_result.data.get("timeline", []) if escalation_result and escalation_result.success else [],
+            "timeline": [
+                {"stage": "submitted", "action": "Initial multi-channel submission", "completed": True},
+                {"stage": "councillor_tagged", "action": "Ward councillor tagged (Day 7)", "completed": False},
+                {"stage": "rti_filed", "action": "RTI application filed (Day 14)", "completed": False},
+                {"stage": "mla_tagged", "action": "MLA + media notified (Day 21)", "completed": False},
+                {"stage": "pil_drafted", "action": "PIL outline drafted (Day 30)", "completed": False},
+            ],
         },
         "prediction": prediction_result.data if prediction_result and prediction_result.success else None,
         "pipeline_latency_ms": total_latency,

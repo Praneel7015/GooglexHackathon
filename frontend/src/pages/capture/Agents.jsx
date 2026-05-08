@@ -21,7 +21,13 @@ export default function Agents() {
   const patchRef = useRef(patch);
   const navigateRef = useRef(navigate);
 
+  const submittedRef = useRef(false);
+
   useEffect(() => {
+    // Guard against React StrictMode double-mount
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+
     const snapshot = curRef.current;
     let cancelled = false;
 
@@ -55,13 +61,18 @@ export default function Agents() {
         animIdx++;
       }, 1800);
 
+      // Get user info from store for user-attribution
+      const state = useApp.getState();
+      const userName = state.user?.name || undefined;
+      const userEmail = state.channels?.email?.connected ? state.channels.email.value : undefined;
+
       // Real backend call
       const result = await api.submitReport({
         photo: photoFile,
         fallback_lat: snapshot.gps?.[0],
         fallback_lng: snapshot.gps?.[1],
-        user_name: undefined,
-        user_email: undefined,
+        user_name: userName,
+        user_email: userEmail,
         voice_note: snapshot.voiceBlob || undefined,
       });
 
@@ -85,10 +96,17 @@ export default function Agents() {
           crowd: cv.is_bundled
             ? `Bundling ${cv.member_count} nearby reports · joint complaint`
             : `Standalone complaint · ${(cv.nearest_complaints || []).length} nearby`,
-          drafting: dr.tweet_text ? 'Tweet · email · RTI drafted' : 'Drafts generated',
-          submit: sub.status === 'sent' ? 'Dispatched · Twitter ✓ · Email ✓' :
-                  sub.status === 'suppressed' ? `Suppressed · bundled (${sub.cluster_size_at_send})` :
-                  'Dispatched · stub mode',
+          drafting: dr.email_subject ? 'Email + complaint letter drafted' : 'Drafts generated',
+          submit: (() => {
+            const chs = sub.submitted_channels || [];
+            const emailOk = chs.find(c => c.channel === 'email')?.status === 'success';
+            const tweetOk = chs.find(c => c.channel === 'twitter')?.status === 'success';
+            if (sub.status === 'suppressed') return `Bundled (${sub.cluster_size_at_send} residents)`;
+            const parts = [];
+            if (emailOk) parts.push('Email ✓');
+            if (tweetOk) parts.push('Tweet ✓');
+            return parts.length ? `Dispatched · ${parts.join(' · ')}` : 'Dispatched';
+          })(),
         });
         setActiveIndex(AGENT_STAGES.length);
 
@@ -108,9 +126,21 @@ export default function Agents() {
           if (!cancelled) navigateRef.current('/confirm');
         }, 1200);
       } else {
-        // Backend failed — fall back to mock
-        console.warn('[Agents] Backend unavailable, falling back to mock pipeline');
-        runMock();
+        // Backend failed — save locally, don't fake success
+        console.warn('[Agents] Backend unavailable, complaint saved locally only');
+        setOutputs({
+          reporter: 'Offline — saved locally',
+          geo: 'Will process when online',
+          routing: '—',
+          crowd: '—',
+          drafting: '—',
+          submit: 'Queued for retry',
+        });
+        setActiveIndex(AGENT_STAGES.length);
+        patchRef.current({ backendResult: null });
+        setTimeout(() => {
+          if (!cancelled) navigateRef.current('/confirm');
+        }, 1500);
       }
     }
 

@@ -63,21 +63,20 @@ class DraftingAgent(BaseAgent):
         whatsapp_prompt = self._whatsapp_prompt(officer_name, issue_type, ward, ward_name, description, is_bundled, member_count)
         rti_prompt = self._rti_prompt(issue_type, ward, ward_name, address, agency_name, complaint_id)
 
-        # Run ALL 5 in parallel
+        # Run email + tweet in parallel (2 calls — fast for free tier)
         results = await asyncio.gather(
             generate_text(email_prompt),
-            generate_text(kannada_prompt),
             generate_text(tweet_prompt),
-            generate_text(whatsapp_prompt),
-            generate_text(rti_prompt),
             return_exceptions=True,
         )
 
         email_en = results[0] if isinstance(results[0], str) else f"Civic complaint regarding {issue_type} at Ward {ward}."
-        email_kn = results[1] if isinstance(results[1], str) else ""
-        tweet = results[2] if isinstance(results[2], str) else ""
-        whatsapp = results[3] if isinstance(results[3], str) else ""
-        rti = results[4] if isinstance(results[4], str) else ""
+        tweet = results[1] if isinstance(results[1], str) else ""
+
+        # Generate others without Gemini (saves ~30s on free tier)
+        email_kn = ""  # Kannada translation deferred
+        whatsapp = f"Namaste {officer_name}, a {issue_type.replace('_',' ')} issue has been reported in Ward {ward} ({ward_name}). {count_phrase.capitalize()}. We request prompt action. — NammaCity Team"
+        rti = f"RTI Application — Action-taken report requested for {issue_type.replace('_',' ')} at Ward {ward}, {address[:80]}. Ref: NammaCity #{complaint_id}"
 
         # Ensure tweet fits 280 chars
         tweet = tweet.strip().replace("\n", " ")[:280]
