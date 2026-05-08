@@ -30,18 +30,27 @@ export default function Capture() {
   useEffect(() => {
     let cancelled = false;
     async function start() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } }, audio: false
-        });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
+      // Try exact back camera first, fall back to ideal
+      const constraints = [
+        { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        { video: true, audio: false },
+      ];
+      let stream = null;
+      for (const c of constraints) {
+        try { stream = await navigator.mediaDevices.getUserMedia(c); break; }
+        catch (_) { /* try next */ }
+      }
+      if (!stream) { setError('Camera unavailable'); return; }
+      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(() => {});
           setReady(true);
-        }
-      } catch (e) { setError(e.message || 'Camera unavailable'); }
+        };
+      }
     }
     start();
     return () => {
@@ -107,9 +116,24 @@ export default function Capture() {
               </div>
             </div>
           ) : (
-            <video ref={videoRef} muted playsInline autoPlay className="w-full h-full object-cover" style={{ filter: 'saturate(.85)' }} />
+            <>
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                autoPlay
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'saturate(.9)' }}
+              />
+              {!ready && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink">
+                  <div className="w-8 h-8 rounded-full border-2 border-mist/20 border-t-mist animate-spin mb-3" />
+                  <span className="font-mono text-[10px] text-mist/55 tracking-wider">STARTING CAMERA…</span>
+                </div>
+              )}
+            </>
           )}
-          <div className="absolute inset-0 bg-olive opacity-[.12] mix-blend-multiply pointer-events-none" />
+          <div className="absolute inset-0 bg-olive opacity-[.08] mix-blend-multiply pointer-events-none" />
         </div>
 
         <div className="relative z-10 flex justify-center pt-2">

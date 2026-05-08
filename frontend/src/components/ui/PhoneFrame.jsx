@@ -17,7 +17,7 @@ export default function PhoneFrame({ children, full = false, className = '' }) {
             <span>9:41</span>
             <span>···  ▮▮▮</span>
           </div>
-          <div className="absolute inset-x-3.5 top-9 bottom-5 overflow-hidden flex flex-col">
+          <div className="absolute inset-x-3.5 top-9 bottom-5 overflow-hidden flex flex-col h-[calc(100%-3.25rem)]">
             {children}
           </div>
           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-1 bg-ink/40 rounded-full" />
