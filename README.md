@@ -1,6 +1,3 @@
-<<<<<<< Updated upstream
-# GooglexHackathon
-=======
 # NammaCity - Civic Operating System for Bangalore
 
 Multi-agent AI civic OS: photograph any civic issue, auto-route to the right agency, bundle similar nearby complaints, escalate automatically, track on a public dashboard.
@@ -50,4 +47,3 @@ cd backend
 source venv/bin/activate
 pytest tests/ -v
 ```
->>>>>>> Stashed changes
