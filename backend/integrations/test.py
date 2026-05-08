@@ -34,7 +34,7 @@ async def main() -> None:
         GmailConfig(
             dry_run=False,
             username="owaistab18@gmail.com",
-            password="ekrd lqbw yqpl ctpl",
+            password="ekrd lqbw yqpl c",
             from_email="owaistab18@gmail.com",
         )
     )
@@ -43,7 +43,7 @@ async def main() -> None:
         WhatsAppConfig(
             dry_run=False,
             endpoint_url="https://graph.facebook.com/v25.0/1129321136928938/messages",
-            bearer_token="EAAyEOhTsZAzwBRe4vIOFiaZAAkv26xNIHMu1qNwT6RQXDPtJBCGzZApY9ztGIjTOpXqxvMy4X8ZBu2MvMjSpT9AZAecZBFK8Fk3xSDhkJqw0HX8fh91pLB5i9afCagViA8kL7Ti6US3CyKVDMRBCiK82PRtgwcGSd24uR8PSldP3MieWn2IfFIH0NDg9lJejmqn0UUZABL7bLSOwZCXjioYs75nZBVcSaLzenPwjTdytqZB7xung5ALw28t6WxmBZCiR2PvX1QLL2smz1Ky1gLtihBQAAQ5",
+            bearer_token="EAAyEOhTsZAzwBReIOFiaZAAkv26xNIHMu1qNwT6RQXDPtJBCGzZApY9ztGIjTOpXqxvMy4X8ZBu2MvMjSpT9AZAecZBFK8Fk3xSDhkJqw0HX8fh91pLB5i9afCagViA8kL7Ti6US3CyKVDMRBCiK82PRtgwcGSd24uR8PSldP3MieWn2IfFIH0NDg9lJejmqn0UUZABL7bLSOwZCXjioYs75nZBVcSaLzenPwjTdytqZB7xung5ALw28t6WxmBZCiR2PvX1QLL2smz1Ky1gLtihBQAAQ5",
         )
     )
 
