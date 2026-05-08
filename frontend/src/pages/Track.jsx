@@ -40,25 +40,50 @@ export default function Track() {
         <div className="text-[10px] font-sans text-coffee/65 mt-1.5">{T('tr.basis')}</div>
       </Card>
 
-      <div className="relative mt-5 pl-1">
-        <div className="absolute left-[14px] top-2 bottom-2 w-px border-l border-dashed border-beige" />
+      <div className="relative mt-5 px-1">
         {steps.map((s, i) => {
-          const active = s.status === 'active';
+          const status = s.status; // 'sent', 'active', 'queued'
+          const done = status === 'sent';
+          const active = status === 'active';
+          const isLast = i === steps.length - 1;
+
           return (
-            <div key={i} className="flex gap-3 py-1.5 items-start">
-              <div className="w-7 flex justify-center pt-0.5">
-                <span className={['w-3.5 h-3.5 rounded-full border-[1.5px] border-line',
-                  s.status === 'sent' ? 'bg-olive' : 'bg-paper',
-                  active ? 'shadow-[0_0_0_4px_rgba(113,129,109,.25)] animate-pulse-soft' : ''
-                ].join(' ')} />
-              </div>
-              <div className={`flex-1 ${active ? 'border-l-2 border-olive pl-2 -ml-0.5' : ''}`}>
-                <div className="flex justify-between font-sans text-[11.5px] font-semibold">
-                  <span className={active ? 'text-coffee' : 'text-coffee/65'}>Day {s.day} · {s.label}</span>
-                  <span className="font-mono text-[10px] text-olive">
-                    {s.status === 'sent' ? '✓' : s.status === 'active' ? '· · ·' : ''}
+            <div key={i} className={`flex gap-4 items-stretch transition-opacity duration-300 ${status === 'queued' ? 'opacity-55' : 'opacity-100'}`}>
+              {/* Timeline column */}
+              <div className="w-5 flex flex-col items-center relative">
+                {/* Line segment */}
+                {!isLast && (
+                  <div className={['absolute top-5 bottom-0 w-[2px] rounded-full transition-colors duration-500', 
+                    done ? 'bg-olive' : 'bg-line/20'].join(' ')} />
+                )}
+                
+                {/* Circle */}
+                <div className="z-10 bg-paper py-1">
+                  <span className={['flex items-center justify-center w-[18px] h-[18px] rounded-full border-[2px] transition-colors duration-300',
+                    done ? 'bg-olive border-olive text-mist' : 
+                    active ? 'bg-paper border-olive shadow-[0_0_0_4px_rgba(113,129,109,.15)] animate-pulse-soft' : 
+                    'bg-paper border-line/40'
+                  ].join(' ')}>
+                    {done && (
+                      <svg viewBox="0 0 14 14" className="w-[10px] h-[10px]">
+                        <path d="M3 7.5 L5.5 10 L11 4" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                   </span>
                 </div>
+              </div>
+
+              {/* Content column */}
+              <div className="flex-1 pb-6 pt-1">
+                <div className={['font-sans text-[12.5px] font-semibold transition-colors', active ? 'text-coffee' : 'text-coffee/70'].join(' ')}>
+                  Day {s.day} · {s.label}
+                </div>
+                {active && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-olive animate-pulse" />
+                    <span className="text-[10.5px] font-medium text-olive/90 uppercase tracking-tight">Active Step</span>
+                  </div>
+                )}
               </div>
             </div>
           );

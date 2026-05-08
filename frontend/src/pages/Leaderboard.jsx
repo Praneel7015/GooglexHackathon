@@ -31,7 +31,7 @@ export default function Leaderboard() {
 
       {/* table */}
       <div className="border-[1.5px] border-line rounded-md overflow-hidden mt-3 bg-paper">
-        <div className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] bg-beige px-4 py-2 border-b border-line font-sans text-[10px] uppercase tracking-wider font-semibold">
+        <div className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-4 bg-beige px-4 py-2 border-b border-line font-sans text-[10px] uppercase tracking-wider font-semibold">
           <div>#</div>
           <div>{T('lb.col.ward')}</div>
           <div className="hidden md:block">{T('lb.col.councillor')}</div>
@@ -43,7 +43,7 @@ export default function Leaderboard() {
           <Link
             key={w.id}
             to={`/officer/${w.id}`}
-            className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] px-4 py-2.5 border-b border-dashed border-beige bg-paper items-center text-[12px] font-sans hover:bg-mist transition-colors"
+            className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-4 px-4 py-2.5 border-b border-dashed border-beige bg-paper items-center text-[12px] font-sans hover:bg-mist transition-colors"
           >
             <span className="font-mono text-coffee/55">{i + 1}</span>
             <span className="font-semibold text-coffee">{w.name}</span>
