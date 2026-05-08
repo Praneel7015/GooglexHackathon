@@ -58,9 +58,36 @@ export default function Capture() {
     navigate('/voice');
   };
 
+  const onUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      patch({
+        photo: ev.target.result,
+        photoTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        gps: [13.0995, 77.5963],
+        ward: 95
+      });
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      navigate('/voice');
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <PhoneFrame>
       <div className="relative h-full bg-ink overflow-hidden flex flex-col">
+        <button 
+          onClick={() => navigate(-1)} 
+          className="absolute left-4 top-12 z-30 w-8 h-8 rounded-full bg-coffee/40 text-mist flex items-center justify-center backdrop-blur-md border border-mist/20 active:scale-90 transition-transform"
+          aria-label="Go back"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+
         <div className="absolute inset-0">
           {error ? (
             <div className="img-x absolute inset-0">
@@ -97,7 +124,14 @@ export default function Capture() {
         })}
 
         <div className="relative z-10 mt-auto pb-7 flex items-center justify-around">
-          <div className="border-[1.5px] border-line bg-paper w-9 h-9 rounded" />
+          <label className="border-[1.5px] border-line bg-paper w-9 h-9 rounded flex items-center justify-center cursor-pointer active:scale-95 transition-transform overflow-hidden">
+            <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#342a21" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </label>
           <button onClick={capture} aria-label="Capture" className="w-16 h-16 rounded-full bg-olive border-[3px] border-paper active:scale-95 transition-transform" style={{ boxShadow: '0 0 0 1.5px #2a221b' }} />
           <div className="bg-coffee text-mist border-[1.5px] border-line w-9 h-9 rounded-full flex items-center justify-center text-[14px]">🎙</div>
         </div>

@@ -13,6 +13,7 @@ export default function Onboarding() {
   const [dragX, setDragX] = useState(0);
   const dragStart = useRef(null);
   const isDragging = useRef(false);
+  const wheelLock = useRef(false);
   const navigate = useNavigate();
   const setOnboarded = useApp(s => s.setOnboarded);
 
@@ -38,6 +39,16 @@ export default function Onboarding() {
     else if (delta > SWIPE_THRESHOLD) goTo(idx - 1);
   };
 
+  const onWheel = (e) => {
+    if (Math.abs(e.deltaX) < Math.abs(e.deltaY) || Math.abs(e.deltaX) < 15) return;
+    if (wheelLock.current) return;
+    wheelLock.current = true;
+    setTimeout(() => { wheelLock.current = false; }, 600);
+    
+    if (e.deltaX > 0) setIdx(prev => Math.min(CARDS.length - 1, prev + 1));
+    else setIdx(prev => Math.max(0, prev - 1));
+  };
+
   const stripOffset = -(idx * 100) + (dragX / 3.5);
 
   return (
@@ -50,7 +61,7 @@ export default function Onboarding() {
 
         <div className="overflow-hidden rounded-md border-[1.5px] border-line bg-mist cursor-grab active:cursor-grabbing select-none touch-pan-y"
           style={{ height: '360px' }}
-          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
           <div className="flex h-full" style={{
             width: `${CARDS.length * 100}%`,
             transform: `translateX(${stripOffset / CARDS.length}%)`,

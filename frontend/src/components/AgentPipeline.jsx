@@ -1,45 +1,69 @@
-// Visual representation of the 6-stage pipeline. Pure presentational —
-// stage state is driven by a parent that uses runPipeline().
 import { AGENT_STAGES } from '../lib/agents';
 
 export default function AgentPipeline({ activeIndex = 0, outputs = {} }) {
   return (
-    <div className="relative pl-1">
-      <div className="absolute left-[14px] top-2 bottom-2 w-px border-l border-dashed border-beige" />
+    <div className="w-full max-w-[340px] mx-auto relative mt-2">
+      {/* Background continuous line */}
+      <div className="absolute left-1/2 top-3 bottom-6 w-[2px] -ml-[1px] bg-line/20 rounded-full" />
+      
       {AGENT_STAGES.map((s, i) => {
         const status = i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'queued';
+        const isLast = i === AGENT_STAGES.length - 1;
+        const isLeft = i % 2 === 0;
+
         return (
           <div
             key={s.key}
-            className={`flex gap-3 py-2 items-start transition-opacity duration-300 ${status === 'queued' ? 'opacity-50' : 'opacity-100'}`}
+            className={`relative flex w-full transition-opacity duration-300 ${status === 'queued' ? 'opacity-60' : 'opacity-100'}`}
           >
-            <div className="w-7 flex justify-center pt-0.5">
+            {/* Foreground line segment */}
+            {!isLast && (
+              <div 
+                className={`absolute left-1/2 top-[22px] bottom-[-4px] w-[2px] -ml-[1px] transition-colors duration-500 z-0 ${status === 'done' ? 'bg-olive' : 'bg-transparent'}`} 
+              />
+            )}
+
+            {/* Left Column */}
+            <div className={`w-1/2 pr-6 pt-0.5 pb-7 ${isLeft ? 'text-right' : ''}`}>
+              {isLeft && (
+                <>
+                  <div className="font-sans text-[13px] font-semibold text-coffee">{s.name}</div>
+                  <div className="font-sans text-[11px] text-coffee/70 leading-relaxed mt-0.5">
+                    {status === 'queued' ? 'queued' : (outputs[s.key] || s.hint)}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Center Circle */}
+            <div className="absolute left-1/2 top-1 -ml-[9px] z-10 bg-paper py-1">
               <span
                 className={[
-                  'block w-3.5 h-3.5 rounded-full border-[1.5px] border-line',
-                  status === 'done'   ? 'bg-paper'   : '',
-                  status === 'active' ? 'bg-olive shadow-[0_0_0_4px_rgba(113,129,109,.25)] animate-pulse-soft' : '',
-                  status === 'queued' ? 'bg-paper'   : ''
+                  'flex items-center justify-center w-[18px] h-[18px] rounded-full border-[2px] transition-colors duration-300',
+                  status === 'done'   ? 'bg-olive border-olive text-paper' : 
+                  status === 'active' ? 'bg-paper border-olive shadow-[0_0_0_4px_rgba(113,129,109,.15)] animate-pulse-soft' : 
+                  'bg-paper border-line/50'
                 ].join(' ')}
                 aria-hidden
               >
                 {status === 'done' && (
-                  <svg viewBox="0 0 14 14" className="w-full h-full">
-                    <path d="M3 7 L6 10 L11 4" stroke="#71816d" strokeWidth="2" fill="none" strokeLinecap="round" />
+                  <svg viewBox="0 0 14 14" className="w-[10px] h-[10px]">
+                    <path d="M3 7.5 L5.5 10 L11 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between gap-2 font-sans text-[12px] font-semibold text-coffee">
-                <span>{s.name}</span>
-                <span className="font-mono text-[10px] text-coffee/55">
-                  {status === 'active' ? '· · ·' : status === 'done' ? '✓' : ''}
-                </span>
-              </div>
-              <div className="font-sans text-[11px] text-coffee/70 leading-snug mt-0.5">
-                {status === 'queued' ? 'queued' : (outputs[s.key] || s.hint)}
-              </div>
+
+            {/* Right Column */}
+            <div className={`w-1/2 pl-6 pt-0.5 pb-7 ${!isLeft ? 'text-left' : ''}`}>
+              {!isLeft && (
+                <>
+                  <div className="font-sans text-[13px] font-semibold text-coffee">{s.name}</div>
+                  <div className="font-sans text-[11px] text-coffee/70 leading-relaxed mt-0.5">
+                    {status === 'queued' ? 'queued' : (outputs[s.key] || s.hint)}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         );

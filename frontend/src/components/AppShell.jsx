@@ -1,19 +1,23 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { Logo } from './ui';
+import { Logo, LanguageToggle } from './ui';
 import { useT } from '../lib/i18n';
 
 const TABS = [
-  { to: '/capture',   labelKey: 'nav.file',      icon: 'camera' },
-  { to: '/track',     labelKey: 'nav.track',     icon: 'list' },
-  { to: '/dashboard', labelKey: 'nav.dashboard', icon: 'map' },
-  { to: '/settings',  labelKey: 'nav.settings',  icon: 'gear' }
+  { to: '/capture',     labelKey: 'nav.file',      icon: 'camera' },
+  { to: '/track',       labelKey: 'nav.track',     icon: 'list' },
+  { to: '/dashboard',   labelKey: 'nav.dashboard', icon: 'map' },
+  { to: '/leaderboard', labelKey: 'nav.wards',     icon: 'chart' },
+  { to: '/officer/188', labelKey: 'nav.officer',   icon: 'user' },
+  { to: '/settings',    labelKey: 'nav.settings',  icon: 'gear' }
 ];
 
 const ICONS = {
   camera: <path d="M5 8 H8 L10 6 H14 L16 8 H19 V18 H5 Z M12 11 a3 3 0 1 0 .01 0" />,
   list:   <path d="M5 7 H19 M5 12 H19 M5 17 H19" />,
   map:    <path d="M5 6 L9 5 L15 7 L19 6 V18 L15 19 L9 17 L5 18 Z M9 5 V17 M15 7 V19" />,
-  gear:   <path d="M12 8 a4 4 0 1 0 .01 0 M12 4 v2 M12 18 v2 M4 12 h2 M18 12 h2 M6.3 6.3 l1.4 1.4 M16.3 16.3 l1.4 1.4 M6.3 17.7 l1.4 -1.4 M16.3 7.7 l1.4 -1.4" />
+  gear:   <path d="M12 8 a4 4 0 1 0 .01 0 M12 4 v2 M12 18 v2 M4 12 h2 M18 12 h2 M6.3 6.3 l1.4 1.4 M16.3 16.3 l1.4 1.4 M6.3 17.7 l1.4 -1.4 M16.3 7.7 l1.4 -1.4" />,
+  chart:  <path d="M3 3v18h18 M7 14l4-4 4 4 4-8" strokeLinejoin="round" />,
+  user:   <path d="M12 11a4 4 0 100-8 4 4 0 000 8z M4 21a8 8 0 0116 0" />
 };
 
 function Icon({ name, active }) {
@@ -33,7 +37,7 @@ export default function AppShell() {
       </header>
 
       <div className="flex-1 flex md:flex-row flex-col">
-        <aside className="hidden md:flex md:flex-col w-56 bg-coffee text-mist border-r border-line p-5 gap-2">
+        <aside className="hidden md:flex md:flex-col w-48 bg-coffee text-mist border-r border-line p-5 gap-2">
           <Link to="/" className="mb-4"><Logo size={32} dark /></Link>
           {TABS.map(t => (
             <NavLink key={t.to} to={t.to} className={({ isActive }) =>
@@ -51,6 +55,16 @@ export default function AppShell() {
         </aside>
 
         <main className="flex-1 min-w-0 pb-20 md:pb-0">
+          <div className="bg-coffee text-mist border-b border-line">
+            <div className="px-4 md:px-8 py-3 md:py-4 flex flex-wrap items-center gap-3 md:gap-5">
+              <div className="flex-1 min-w-[140px]">
+                <div className="font-sans text-[9px] uppercase tracking-[.18em] opacity-70">{T('dash.live')}</div>
+                <div className="font-kn text-[11px] opacity-75 mt-0.5">{T('dash.subtitle')}</div>
+              </div>
+              <div className="font-mono text-[10px] opacity-70 hidden lg:block">{new Date().toUTCString().slice(5, 22)} IST</div>
+              <LanguageToggle tone="dark" />
+            </div>
+          </div>
           <Outlet />
         </main>
       </div>

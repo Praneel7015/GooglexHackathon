@@ -1,5 +1,5 @@
 import BangaloreMap from '../components/BangaloreMap';
-import { Card, Chip, LanguageToggle, Logo } from '../components/ui';
+import { Card, Chip, Logo } from '../components/ui';
 import { aggregateStats, COMPLAINTS, WARDS } from '../lib/seed';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -13,18 +13,6 @@ export default function Dashboard() {
 
   return (
     <div className="bg-paper min-h-[calc(100vh-60px)]">
-      {/* masthead */}
-      <div className="bg-coffee text-mist border-b border-line">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-4 flex flex-wrap items-center gap-3 md:gap-5">
-          <div className="flex-1 min-w-[140px]">
-            <div className="font-sans text-[9px] uppercase tracking-[.18em] opacity-70">{T('dash.live')}</div>
-            <div className="font-kn text-[11px] opacity-75 mt-0.5">{T('dash.subtitle')}</div>
-          </div>
-          <div className="font-mono text-[10px] opacity-70 hidden md:block">{new Date().toUTCString().slice(5, 22)} IST</div>
-          <LanguageToggle tone="dark" />
-        </div>
-      </div>
-
       {/* stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-b border-line">
         {[

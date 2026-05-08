@@ -28,7 +28,7 @@ export default function Connect() {
         </div>
 
         <Chip>{T('conn.step')}</Chip>
-        <h1 className="font-hand text-coffee text-[26px] leading-tight font-bold tracking-tight mt-1.5" style={{ whiteSpace: 'pre-line' }}>
+        <h1 className="font-hand text-coffee text-[22px] leading-tight font-bold tracking-tight mt-1.5">
           {T('conn.heading')}
         </h1>
         <p className="font-sans text-[11.5px] text-coffee/75 leading-relaxed mb-4 mt-2">{T('conn.body')}</p>
