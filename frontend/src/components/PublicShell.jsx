@@ -4,8 +4,11 @@ import { useState } from 'react';
 import { useT } from '../lib/i18n';
 
 const NAV = [
-  { to: '/dashboard', labelKey: 'nav.dashboard' },
-  { to: '/leaderboard', labelKey: 'nav.wards' }
+  { to: '/capture',     labelKey: 'nav.file' },
+  { to: '/track',       labelKey: 'nav.track' },
+  { to: '/dashboard',   labelKey: 'nav.dashboard' },
+  { to: '/leaderboard', labelKey: 'nav.wards' },
+  { to: '/settings',    labelKey: 'nav.settings' },
 ];
 
 export default function PublicShell({ floatingHeader = false }) {
@@ -26,7 +29,7 @@ export default function PublicShell({ floatingHeader = false }) {
           </nav>
           <div className="flex-1" />
           <LanguageToggle />
-          <Button as={Link} to="/install" variant="primary" size="sm" className="hidden md:inline-flex">{T('nav.openapp')}</Button>
+          <Button as="button" variant="primary" size="sm" className="hidden md:inline-flex" onClick={() => { window.location.href = '/#install'; }}>{T('nav.openapp')}</Button>
           <button
             onClick={() => setOpen(o => !o)}
             className="md:hidden p-2 rounded-md border border-line bg-paper"
@@ -43,7 +46,7 @@ export default function PublicShell({ floatingHeader = false }) {
               {NAV.map(n => (
                 <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="py-1.5">{T(n.labelKey)}</Link>
               ))}
-              <Button as={Link} to="/install" variant="primary" size="md" full onClick={() => setOpen(false)}>{T('nav.openapp')}</Button>
+              <Button as="button" variant="primary" size="md" full onClick={() => { setOpen(false); window.location.href = '/#install'; }}>{T('nav.openapp')}</Button>
             </div>
           </div>
         )}
@@ -57,7 +60,7 @@ export default function PublicShell({ floatingHeader = false }) {
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6 flex flex-col md:flex-row gap-4 items-start md:items-center font-sans text-[12px]">
           <Logo size={24} dark />
           <span>NammaCity · ನಮ್ಮಸಿಟಿ · An open civic project for Bengaluru</span>
-          <span className="md:ml-auto opacity-70">Privacy · Source · Methodology · Contact</span>
+          <span className="md:ml-auto opacity-70">Privacy · <a href="https://github.com/Praneel7015/GooglexHackathon" target="_blank" rel="noreferrer" className="underline hover:opacity-100">Source</a> · Methodology · Contact</span>
         </div>
       </footer>
     </div>

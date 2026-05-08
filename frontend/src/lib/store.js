@@ -55,6 +55,20 @@ export const useApp = create(persist((set, get) => ({
     preferences: { ...s.preferences, [key]: !s.preferences[key] }
   })),
 
+  signOut: () => set({
+    onboarded: false,
+    user: { name: '', id: null, wardId: null },
+    channels: {
+      email:    { connected: false, value: '' },
+      twitter:  { connected: false, value: '' },
+      whatsapp: { connected: false, value: '' },
+      phone:    { connected: false, value: '' },
+      aadhaar:  { connected: false, value: '' },
+    },
+    preferences: { autoBundle: true, autoTweet7d: true, fileAnonymous: false },
+    filed: [],
+  }),
+
   resetCurrent: () => set({
     current: {
       id: null, photo: null, photoTime: null, voiceBlob: null, voiceDuration: 0,
@@ -72,9 +86,12 @@ export const useApp = create(persist((set, get) => ({
   })),
 
   fileCurrent: () => {
-    const { current, filed } = get();
+    const { current, filed, user, preferences } = get();
     // Use real backend complaint_id if available
     const id = current.backendResult?.complaint_id || current.id || `NMC-${2000 + filed.length}`;
+
+    // Respect fileAnonymous preference
+    const filedName = preferences.fileAnonymous ? 'Anonymous' : (user.name || 'Citizen');
 
     // Build timeline from backend escalation if available, else default
     const backendTimeline = current.backendResult?.escalation?.timeline;
@@ -87,7 +104,9 @@ export const useApp = create(persist((set, get) => ({
         }))
       : [
           { day: 0,  label: `Filed · ${current.agencyCode || 'BBMP'}`, status: 'sent' },
-          { day: 3,  label: 'Twitter escalation · @BBMPCOMM', status: 'sent' },
+          ...(preferences.autoTweet7d
+            ? [{ day: 3, label: 'Twitter escalation · @BBMPCOMM', status: 'sent' }]
+            : []),
           { day: 7,  label: 'Cc Ward Engineer', status: 'active' },
           { day: 14, label: 'CC councillor + RTI draft', status: 'queued' },
           { day: 21, label: 'Press alert · The Hindu civic desk', status: 'queued' },
@@ -97,6 +116,7 @@ export const useApp = create(persist((set, get) => ({
     const filedItem = {
       ...current,
       id,
+      filedAs: filedName,
       submittedAt: Date.now(),
       timeline,
     };

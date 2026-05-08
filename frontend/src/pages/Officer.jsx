@@ -34,7 +34,7 @@ export default function Officer() {
         <Chip>{T('off.chip', { ward: officer.ward })}</Chip>
         <h1 className="font-hand text-coffee text-3xl md:text-4xl mt-1 mb-5 tracking-tight">{T('off.heading')}</h1>
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           {[
             [officer.handled.toLocaleString(), T('off.handled'),  T('off.handled.sub'),  'coffee'],
             [`${officer.avgResponse}d`,        T('off.response'), T('off.response.sub'), 'coffee'],
@@ -67,11 +67,11 @@ export default function Officer() {
         <Chip>{T('off.log')}</Chip>
         <ul className="mt-2">
           {recent.map(r => (
-            <li key={r.id} className="grid grid-cols-[80px_1fr_100px_80px] py-2 border-b border-dashed border-beige font-sans text-[12px] items-center">
-              <span className="font-mono text-[10px] text-olive">{r.id}</span>
-              <span className="text-coffee font-medium">{r.issue} · {r.wardName}</span>
+            <li key={r.id} className="grid grid-cols-[1fr_auto] sm:grid-cols-[80px_1fr_100px_80px] py-2 border-b border-dashed border-beige font-sans text-[12px] items-center gap-2">
+              <span className="hidden sm:block font-mono text-[10px] text-olive">{r.id}</span>
+              <span className="text-coffee font-medium truncate">{r.issue} · {r.wardName}</span>
               <Chip tone={r.status === 'resolved' ? 'olive' : 'paper'}>{r.status}</Chip>
-              <span className="font-mono text-[10px] text-coffee/55 text-right">{r.ageDays}d ago</span>
+              <span className="hidden sm:block font-mono text-[10px] text-coffee/55 text-right">{r.ageDays}d ago</span>
             </li>
           ))}
         </ul>

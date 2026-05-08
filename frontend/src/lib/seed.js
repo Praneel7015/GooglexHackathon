@@ -78,7 +78,7 @@ function seedComplaints(n = 200, salt = 1) {
       agency: ROUTING[issue],
       ageDays,
       status,
-      author: ['anon', 'Sneha R.', 'Rohit K.', 'M. Bhaskar', 'P. Iyer'][Math.floor(rand() * 5)]
+      author: 'Anonymous'
     });
   }
   return out;

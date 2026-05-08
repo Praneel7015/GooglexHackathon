@@ -52,36 +52,36 @@ export default function Leaderboard() {
       </div>
 
       <div className="border-[1.5px] border-line rounded-md overflow-hidden mt-3 bg-paper">
-        <div className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-4 bg-beige px-4 py-2 border-b border-line font-sans text-[10px] uppercase tracking-wider font-semibold">
+        <div className="grid grid-cols-[32px_1fr_72px] md:grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-3 md:gap-x-4 bg-beige px-3 md:px-4 py-2 border-b border-line font-sans text-[10px] uppercase tracking-wider font-semibold">
           <div>#</div>
           <div>{T('lb.col.ward')}</div>
           <div className="hidden md:block">{T('lb.col.councillor')}</div>
-          <div className="text-right">{T('lb.col.open')}</div>
+          <div className="hidden md:block text-right">{T('lb.col.open')}</div>
           <div>{T('lb.col.resolution')}</div>
-          <div className="text-right">{T('lb.col.avgtime')}</div>
+          <div className="hidden md:block text-right">{T('lb.col.avgtime')}</div>
         </div>
         {ranked.map((w, i) => (
           <Link
             key={w.id}
             to={`/officer/${w.id}`}
-            className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-4 px-4 py-2.5 border-b border-dashed border-beige bg-paper items-center text-[12px] font-sans hover:bg-mist transition-colors"
+            className="grid grid-cols-[32px_1fr_72px] md:grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] gap-x-3 md:gap-x-4 px-3 md:px-4 py-2.5 border-b border-dashed border-beige bg-paper items-center text-[12px] font-sans hover:bg-mist transition-colors"
           >
             <span className="font-mono text-coffee/55">{i + 1}</span>
-            <span className="font-semibold text-coffee">{w.name}</span>
-            <span className="hidden md:block text-coffee/75">{w.councillor || ''}</span>
-            <span className="font-mono text-right tabular-nums">{w.open}</span>
-            <span className="flex items-center gap-2">
-              <div className="flex-1 h-1.5 bg-mist border border-line relative overflow-hidden">
+            <span className="font-semibold text-coffee truncate">{w.name}</span>
+            <span className="hidden md:block text-coffee/75 truncate">{w.councillor || ''}</span>
+            <span className="hidden md:block font-mono text-right tabular-nums">{w.open}</span>
+            <span className="flex items-center gap-1.5">
+              <div className="flex-1 h-1.5 bg-mist border border-line relative overflow-hidden hidden md:block">
                 <div
                   className={w.tone === 'olive' ? 'absolute inset-y-0 left-0 bg-olive' : w.tone === 'beige' ? 'absolute inset-y-0 left-0 bg-beige' : 'absolute inset-y-0 left-0 bg-coffee'}
                   style={{ width: `${Math.round((w.resolution || 0) * 100)}%` }}
                 />
               </div>
-              <span className={`font-mono text-[11px] w-9 text-right font-semibold ${w.tone === 'olive' ? 'text-olive' : w.tone === 'coffee' ? 'text-coffee' : 'text-coffee/65'}`}>
+              <span className={`font-mono text-[11px] font-semibold ${w.tone === 'olive' ? 'text-olive' : w.tone === 'coffee' ? 'text-coffee' : 'text-coffee/65'}`}>
                 {Math.round((w.resolution || 0) * 100)}%
               </span>
             </span>
-            <span className="font-mono text-right text-coffee/65">{w.avg}d</span>
+            <span className="hidden md:block font-mono text-right text-coffee/65">{w.avg}d</span>
           </Link>
         ))}
       </div>

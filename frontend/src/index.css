@@ -27,6 +27,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
+  overflow-x: hidden;
 }
 
 /* hide scrollbars on touch surfaces but keep scrolling */

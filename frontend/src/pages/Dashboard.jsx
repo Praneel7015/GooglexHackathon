@@ -75,7 +75,7 @@ export default function Dashboard() {
         {/* MAP */}
         <div className="relative h-[60vh] lg:h-[calc(100vh-200px)] border-b lg:border-b-0 lg:border-r border-line">
           <BangaloreMap mode="clusters" interactive />
-          <div className="absolute top-3 left-3 z-[400] bg-paper border border-line rounded p-2 text-[10px] shadow-sm">
+          <div className="absolute top-3 right-3 z-[400] bg-paper border border-line rounded p-2 text-[10px] shadow-sm">
             <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mb-1">{T('dash.density')}</div>
             <div className="flex items-center gap-2">
               <div className="w-20 h-2 border border-line" style={{ background: 'linear-gradient(to right, #f1e0c5, #71816d, #342a21)' }} />

@@ -4,7 +4,6 @@ import PublicShell from './components/PublicShell';
 import AppShell from './components/AppShell';
 
 import Landing from './pages/Landing';
-import Install from './pages/Install';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Officer from './pages/Officer';
@@ -33,7 +32,6 @@ export default function App() {
       {/* Public site (with header + footer) */}
       <Route element={<PublicShell />}>
         <Route path="/"             element={<Landing />} />
-        <Route path="/install"      element={<Install />} />
       </Route>
 
       {/* App shell with bottom nav + sidebar */}

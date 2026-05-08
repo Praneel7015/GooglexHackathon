@@ -7,7 +7,6 @@ const TABS = [
   { to: '/track',       labelKey: 'nav.track',     icon: 'list' },
   { to: '/dashboard',   labelKey: 'nav.dashboard', icon: 'map' },
   { to: '/leaderboard', labelKey: 'nav.wards',     icon: 'chart' },
-  { to: '/officer/188', labelKey: 'nav.officer',   icon: 'user' },
   { to: '/settings',    labelKey: 'nav.settings',  icon: 'gear' }
 ];
 
@@ -66,6 +65,13 @@ export default function AppShell() {
             </div>
           </div>
           <Outlet />
+          <footer className="hidden md:block border-t border-line bg-coffee text-mist/85">
+            <div className="px-4 md:px-8 py-5 flex flex-col md:flex-row gap-3 items-start md:items-center font-sans text-[11px]">
+              <Logo size={22} dark />
+              <span className="opacity-80">NammaCity · ನಮ್ಮಸಿಟಿ · An open civic project for Bengaluru</span>
+              <span className="md:ml-auto opacity-55">Privacy · <a href="https://github.com/Praneel7015/GooglexHackathon" target="_blank" rel="noreferrer" className="underline hover:opacity-100">Source</a> · Methodology · Contact</span>
+            </div>
+          </footer>
         </main>
       </div>
 
