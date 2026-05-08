@@ -7,7 +7,9 @@ Implements automatic model fallback chain on 429 rate limits.
 import asyncio
 import logging
 import os
+import re
 import time
+import uuid
 
 from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
@@ -25,38 +27,43 @@ if _api_key and not os.environ.get("GOOGLE_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = _api_key
 
 # ── Model fallback chain ──────────────────────────────────────────────────────
-# gemini-2.5-flash: 20 req/day (free tier) — use as primary when quota allows
-# gemini-2.0-flash: 1500 req/day (free tier) — primary workhorse
-# gemini-2.0-flash-lite: 1500 req/day (free tier) — last resort
+# Only gemini-2.5-flash is confirmed available for this API key via ADK (v1beta).
 MODEL_FALLBACK_CHAIN = [
-    "gemini-2.0-flash",        # primary — 1500/day free
-    "gemini-2.0-flash-lite",   # fallback — 1500/day free, lower quality
-    "gemini-2.5-flash",        # last resort — 20/day free, best quality
+    "gemini-2.5-flash",
 ]
 DEFAULT_MODEL = MODEL_FALLBACK_CHAIN[0]
-EMBED_MODEL = "text-embedding-004"
+# gemini-embedding-001 is the available embedding model on the Gemini API.
+# It produces 3072-dimensional vectors — must match Qdrant collection VECTOR_SIZE.
+EMBED_MODEL = "models/gemini-embedding-001"
 
 # ── Session service singleton ─────────────────────────────────────────────────
 _session_service = InMemorySessionService()
-_session_counter = 0
+
+# ── Embedding client singleton ────────────────────────────────────────────────
+_embed_client = None
 
 
-def _next_session_id() -> str:
-    global _session_counter
-    _session_counter += 1
-    return f"nammacity-inference-{_session_counter}"
+def _get_embed_client():
+    """Return a shared google-genai client for embedding calls."""
+    global _embed_client
+    if _embed_client is None:
+        from google import genai as _genai
+        _embed_client = _genai.Client(api_key=_api_key or settings.gemini_api_key)
+    return _embed_client
+
+
+# ── Retry delay parser ────────────────────────────────────────────────────────
+# Matches both  "retryDelay": "23s"  and  retryDelay=23.0s  in ADK error strings
+_RETRY_DELAY_RE = re.compile(r'retryDelay["\s:=]+(\d+(?:\.\d+)?)')
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
-    """Return True if the exception is a 429 quota error."""
     msg = str(exc)
     return "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower()
 
 
 def _parse_retry_delay(exc: Exception) -> float:
-    """Extract retryDelay seconds from ADK error message, default 5s."""
-    import re
-    match = re.search(r"retryDelay.*?(\d+(?:\.\d+)?)\s*s", str(exc))
+    match = _RETRY_DELAY_RE.search(str(exc))
     if match:
         return min(float(match.group(1)), 10.0)  # cap at 10s during demo
     return 5.0
@@ -74,16 +81,18 @@ async def _run_agent_once(
     """
     Run an LlmAgent for a single turn.
     On 429, waits the retry delay then tries the next model in the fallback chain.
+    Sessions are deleted after use to prevent unbounded memory growth.
     """
-    # Build the fallback list: requested model first, then the rest of the chain
     requested = agent.model or DEFAULT_MODEL
     chain = [requested] + [m for m in MODEL_FALLBACK_CHAIN if m != requested]
 
     last_exc: Exception | None = None
 
     for model in chain:
+        # Each attempt gets a collision-free session ID
+        session_id = f"nc-{uuid.uuid4().hex}"
+        session = None
         try:
-            # Rebuild agent with this model (LlmAgent is immutable after init)
             current_agent = LlmAgent(
                 name=agent.name,
                 model=model,
@@ -95,7 +104,6 @@ async def _run_agent_once(
                 app_name=app_name,
                 session_service=_session_service,
             )
-            session_id = _next_session_id()
             session = await _session_service.create_session(
                 app_name=app_name,
                 user_id="nammacity_system",
@@ -130,14 +138,24 @@ async def _run_agent_once(
                         "429 on %s (retryDelay=%.1fs) — falling back to %s",
                         model, delay, next_model,
                     )
-                    # Brief pause before trying next model
                     await asyncio.sleep(min(delay, 2.0))
                     continue
                 else:
                     logger.error("All models rate-limited. Last error: %s", exc)
                     raise
             else:
-                raise  # Non-429 errors propagate immediately
+                raise
+        finally:
+            # Clean up session to prevent InMemorySessionService growing unboundedly
+            if session is not None:
+                try:
+                    await _session_service.delete_session(
+                        app_name=app_name,
+                        user_id="nammacity_system",
+                        session_id=session_id,
+                    )
+                except Exception:
+                    pass
 
     raise last_exc or RuntimeError("All models in fallback chain failed")
 
@@ -212,11 +230,11 @@ async def embed_text(
 ) -> list[float]:
     """
     Embed text using google-genai directly (ADK does not wrap embedding models).
-    Embedding models have separate higher quotas.
+    Uses a singleton client to avoid creating a new HTTP connection per call.
+    Model: gemini-embedding-001 → 3072 dimensions (matches Qdrant collection).
     """
-    from google import genai as _genai
     start = time.perf_counter()
-    client = _genai.Client(api_key=_api_key or settings.gemini_api_key)
+    client = _get_embed_client()
     response = client.models.embed_content(model=model, contents=text)
     logger.debug("embed_text model=%s latency_ms=%.1f", model, (time.perf_counter() - start) * 1000)
     return response.embeddings[0].values

@@ -18,17 +18,13 @@ _client: genai.Client | None = None
 
 DEFAULT_TIMEOUT = 30  # seconds
 
-# Fallback chain: try primary, then cheaper models on 429
+# Only gemini-2.5-flash is confirmed available for this API key.
 TEXT_FALLBACK_CHAIN = [
     "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
 ]
 
 MULTIMODAL_FALLBACK_CHAIN = [
     "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
 ]
 
 

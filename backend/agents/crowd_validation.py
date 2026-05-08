@@ -32,7 +32,7 @@ RADIUS_CONFIG: dict[str, float] = {
     "open_drain": 300.0,
 }
 DEFAULT_RADIUS = 500.0
-BUNDLE_THRESHOLD = 3
+BUNDLE_THRESHOLD = 2   # minimum nearby complaints (excluding current) to form a bundle
 MAX_BUNDLED_IDS = 50
 _EMBED_CACHE_TTL = 300.0   # seconds
 _EMBED_CACHE_MAX = 512     # max entries — evict LRU when full

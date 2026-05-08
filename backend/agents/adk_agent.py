@@ -265,7 +265,7 @@ def _build_orchestrator_agent() -> LlmAgent:
     ]
     agent = LlmAgent(
         name="nammacity_orchestrator",
-        model="gemini-2.0-flash",  # 1500 req/day free vs 20 for 2.5-flash
+        model="gemini-2.5-flash",  # 1500 req/day free vs 20 for 2.5-flash
         description="NammaCity civic AI — routes, bundles, and escalates Bangalore complaints",
         instruction=_ORCHESTRATOR_INSTRUCTION,
         tools=tools,
