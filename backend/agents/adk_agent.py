@@ -27,9 +27,11 @@ from config import settings
 
 logger = logging.getLogger("nammacity.adk")
 
-# ADK requires GOOGLE_API_KEY — map from GEMINI_API_KEY at import time
-if settings.gemini_api_key and not os.environ.get("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
+# ADK requires GOOGLE_API_KEY — preserve any existing env var, otherwise map
+# from settings.google_api_key first and fall back to settings.gemini_api_key.
+_adk_api_key = os.environ.get("GOOGLE_API_KEY") or settings.google_api_key or settings.gemini_api_key
+if _adk_api_key and not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = _adk_api_key
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent singletons — each is an ADK-native NammaCity agent
