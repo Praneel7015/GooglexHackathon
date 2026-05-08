@@ -130,22 +130,39 @@ async def test_routing_maps_correctly(issue_type: str, expected_agency: str) -> 
 
 # --- End-to-End Test ---
 
-@skip_no_gemini
 @pytest.mark.asyncio
 async def test_report_endpoint_e2e() -> None:
-    """POST /api/v1/report with pothole photo returns full pipeline result."""
+    """
+    POST /api/v1/report runs the full pipeline end-to-end.
+    ReporterAgent is mocked so the synthetic fixture image doesn't get
+    flagged as spam — the test validates pipeline wiring, not Gemini output.
+    """
     from main import app
+    from agents.base import AgentOutput
 
     photo_bytes = (FIXTURES / "pothole.jpg").read_bytes()
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.post(
-            "/api/v1/report",
-            files={"photo": ("pothole.jpg", photo_bytes, "image/jpeg")},
-            data={"fallback_lat": "12.9869", "fallback_lng": "77.5519"},
-        )
+    mock_reporter_output = AgentOutput(
+        agent_name="ReporterAgent",
+        success=True,
+        data={
+            "issue_type": "pothole",
+            "severity": 4,
+            "spam_score": 0.02,
+            "raw_description": "Large pothole near MSRIT gate causing traffic hazard.",
+            "transcribed_text": "",
+        },
+    )
+
+    with patch("main.reporter_agent.execute", new_callable=AsyncMock, return_value=mock_reporter_output):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/v1/report",
+                files={"photo": ("pothole.jpg", photo_bytes, "image/jpeg")},
+                data={"fallback_lat": "12.9869", "fallback_lng": "77.5519"},
+            )
 
     assert resp.status_code == 200
     data = resp.json()

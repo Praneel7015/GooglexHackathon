@@ -1,21 +1,36 @@
+"""
+NammaCity FastAPI application — entry point and route definitions.
+Wires all 7 pipeline agents and exposes complaint, dashboard, and escalation APIs.
+"""
+
 import logging
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from agents.base import AgentInput
 from agents.crowd_validation import CrowdValidationAgent
 from agents.drafting import DraftingAgent
+from agents.escalation import EscalationAgent, get_escalation_timeline
 from agents.geo import GeoAgent, load_ward_boundaries
+from agents.prediction import PredictionAgent, get_ward_leaderboard
 from agents.reporter import ReporterAgent
 from agents.routing import RoutingAgent
 from agents.submission import SubmissionAgent
 from config import settings
-from db.client import insert_complaint
+from db.client import (
+    get_active_clusters,
+    get_all_complaints,
+    get_complaint_by_id,
+    get_dashboard_stats,
+    get_map_complaints,
+    insert_complaint,
+)
 from integrations.qdrant_client import ensure_collection
 
 AGENTS = [
@@ -33,13 +48,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("nammacity")
 
-# Agent singletons
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent singletons (one instance shared across all requests)
+# ─────────────────────────────────────────────────────────────────────────────
+
 reporter_agent = ReporterAgent()
 geo_agent = GeoAgent()
 routing_agent = RoutingAgent()
 crowd_validation_agent = CrowdValidationAgent()
 drafting_agent = DraftingAgent()
 submission_agent = SubmissionAgent()
+escalation_agent = EscalationAgent()
+prediction_agent = PredictionAgent()
 
 
 @asynccontextmanager
@@ -80,6 +100,10 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Health & meta
+# ─────────────────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "nammacity-backend"}
@@ -94,6 +118,10 @@ async def info() -> dict:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Core complaint pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+
 @app.post("/api/v1/report")
 async def report(
     photo: UploadFile = File(...),
@@ -106,12 +134,12 @@ async def report(
 ) -> dict:
     """
     Full complaint pipeline:
-    Reporter -> Geo -> Routing -> DB -> CrowdValidation -> Drafting -> Submission
+    Reporter -> Geo -> Routing -> DB -> CrowdValidation -> Drafting -> Submission -> Escalation
     """
     photo_bytes = await photo.read()
     voice_bytes = await voice_note.read() if voice_note else None
 
-    # --- Step 1: Reporter Agent ---
+    # ── Step 1: Reporter Agent ────────────────────────────────────────────────
     reporter_result = await reporter_agent.execute(
         AgentInput(data={
             "photo_bytes": photo_bytes,
@@ -131,7 +159,7 @@ async def report(
             "spam_score": reporter_result.data["spam_score"],
         })
 
-    # --- Step 2: Geo Agent ---
+    # ── Step 2: Geo Agent ─────────────────────────────────────────────────────
     geo_result = await geo_agent.execute(
         AgentInput(data={
             "photo_bytes": photo_bytes,
@@ -140,7 +168,7 @@ async def report(
         })
     )
 
-    # --- Step 3: Routing Agent ---
+    # ── Step 3: Routing Agent ─────────────────────────────────────────────────
     routing_result = await routing_agent.execute(
         AgentInput(data={
             "issue_type": reporter_result.data["issue_type"],
@@ -148,8 +176,8 @@ async def report(
         })
     )
 
-    # --- Step 4: Insert complaint into Supabase ---
-    complaint = {}
+    # ── Step 4: Insert complaint into Supabase ────────────────────────────────
+    complaint: dict = {}
     if geo_result.success and settings.supabase_url:
         try:
             primary_agency_id = None
@@ -168,7 +196,7 @@ async def report(
         except Exception as e:
             logger.warning("DB insert failed (non-fatal): %s", e)
 
-    # --- Step 5: Crowd Validation Agent ---
+    # ── Step 5: Crowd Validation Agent ────────────────────────────────────────
     crowd_result = None
     if complaint.get("id") and geo_result.success:
         crowd_result = await crowd_validation_agent.execute(
@@ -184,7 +212,7 @@ async def report(
 
     crowd_data = crowd_result.data if crowd_result and crowd_result.success else {}
 
-    # --- Step 6: Drafting Agent ---
+    # ── Step 6: Drafting Agent ────────────────────────────────────────────────
     drafting_result = await drafting_agent.execute(
         AgentInput(data={
             "complaint_id": complaint.get("id", ""),
@@ -199,7 +227,7 @@ async def report(
         })
     )
 
-    # --- Step 7: Submission Agent ---
+    # ── Step 7: Submission Agent ──────────────────────────────────────────────
     submission_result = None
     if drafting_result.success:
         submission_result = await submission_agent.execute(
@@ -212,13 +240,42 @@ async def report(
             })
         )
 
-    total_latency = (
+    # ── Step 8: Escalation Agent (fire-and-forget schedule) ───────────────────
+    escalation_result = None
+    if complaint.get("id"):
+        try:
+            escalation_result = await escalation_agent.execute(
+                AgentInput(data={
+                    "complaint_id": complaint["id"],
+                    "complaint": complaint,
+                    "cluster_id": crowd_data.get("cluster_id"),
+                    "ward_name": geo_result.data.get("ward_name", "") if geo_result.success else "",
+                    "address": geo_result.data.get("address", "") if geo_result.success else "",
+                    "agency_name": routing_result.data.get("primary_agency", {}).get("name", "BBMP") if routing_result.success else "BBMP",
+                })
+            )
+        except Exception as e:
+            logger.warning("Escalation scheduling failed (non-fatal): %s", e)
+
+    # ── Step 9: Prediction ────────────────────────────────────────────────────
+    prediction_result = None
+    if geo_result.success:
+        prediction_result = await prediction_agent.execute(
+            AgentInput(data={
+                "ward_number": geo_result.data.get("ward_number"),
+                "issue_type": reporter_result.data["issue_type"],
+                "agency_id": complaint.get("agency_id"),
+            })
+        )
+
+    total_latency = round(
         reporter_result.latency_ms
         + geo_result.latency_ms
         + routing_result.latency_ms
         + (crowd_result.latency_ms if crowd_result else 0)
         + drafting_result.latency_ms
-        + (submission_result.latency_ms if submission_result else 0)
+        + (submission_result.latency_ms if submission_result else 0),
+        2,
     )
 
     return {
@@ -233,5 +290,124 @@ async def report(
             "whatsapp_text": drafting_result.data.get("whatsapp_text"),
         } if drafting_result.success else {"error": drafting_result.error},
         "submission": submission_result.data if submission_result and submission_result.success else None,
-        "pipeline_latency_ms": round(total_latency, 2),
+        "escalation": {
+            "scheduled": True,
+            "timeline": escalation_result.data.get("timeline", []) if escalation_result and escalation_result.success else [],
+        },
+        "prediction": prediction_result.data if prediction_result and prediction_result.success else None,
+        "pipeline_latency_ms": total_latency,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Complaint queries
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/v1/complaints")
+async def list_complaints(
+    status: str | None = Query(None, description="Filter by status: open | in_progress | resolved"),
+    ward_number: int | None = Query(None),
+    issue_type: str | None = Query(None),
+    limit: int = Query(100, le=500),
+) -> dict:
+    """List complaints with optional filters. Used by dashboard and admin views."""
+    complaints = await get_all_complaints(
+        status=status, ward_number=ward_number, issue_type=issue_type, limit=limit
+    )
+    return {"count": len(complaints), "complaints": complaints}
+
+
+@app.get("/api/v1/complaints/{complaint_id}")
+async def get_complaint(complaint_id: str) -> dict:
+    """Fetch a single complaint with its escalation timeline."""
+    complaint = await get_complaint_by_id(complaint_id)
+    if not complaint:
+        return JSONResponse(status_code=404, content={"error": "complaint_not_found"})
+
+    timeline = await get_escalation_timeline(complaint_id)
+
+    # Inline prediction for the detail view
+    prediction = None
+    try:
+        pred_result = await prediction_agent.execute(
+            AgentInput(data={
+                "ward_number": complaint.get("ward_number"),
+                "issue_type": complaint.get("issue_type"),
+                "agency_id": complaint.get("agency_id"),
+            })
+        )
+        if pred_result.success:
+            prediction = {
+                "confidence_message": pred_result.data["confidence_message"],
+                "resolution_rate": pred_result.data["resolution_rate"],
+                "avg_resolution_days": pred_result.data["avg_resolution_days"],
+            }
+    except Exception:
+        pass
+
+    return {
+        "complaint": complaint,
+        "escalation_timeline": timeline,
+        "prediction": prediction,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard APIs
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/v1/dashboard/stats")
+async def dashboard_stats() -> dict:
+    """
+    Aggregate stats for the public dashboard header:
+    totals, status breakdown, top issue types, hotspot wards.
+    """
+    stats = await get_dashboard_stats()
+    leaderboard = get_ward_leaderboard()
+    return {**stats, "ward_leaderboard": leaderboard[:10]}
+
+
+@app.get("/api/v1/dashboard/map")
+async def dashboard_map() -> dict:
+    """
+    All geo-located complaints for the Leaflet.js map.
+    Returns lightweight rows: id, type, severity, lat, lng, cluster_id.
+    """
+    points = await get_map_complaints()
+    return {"count": len(points), "points": points}
+
+
+@app.get("/api/v1/dashboard/clusters")
+async def dashboard_clusters() -> dict:
+    """
+    Active crowd-validation clusters for the heatmap animation.
+    Each cluster has centroid, member_count, issue_type.
+    """
+    clusters = await get_active_clusters()
+    return {"count": len(clusters), "clusters": clusters}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Prediction endpoint (standalone, for frontend ward picker)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/v1/predict")
+async def predict(
+    ward_number: int | None = Query(None),
+    issue_type: str | None = Query(None),
+) -> dict:
+    """
+    Return resolution likelihood for a given ward + issue type.
+    Example: GET /api/v1/predict?ward_number=95&issue_type=pothole
+    """
+    result = await prediction_agent.execute(
+        AgentInput(data={
+            "ward_number": ward_number,
+            "issue_type": issue_type,
+            "include_leaderboard": False,
+        })
+    )
+    if not result.success:
+        return JSONResponse(status_code=500, content={"error": result.error})
+    return result.data
+
