@@ -6,7 +6,7 @@ Classifies civic issues from photo + optional voice using a Google ADK LlmAgent.
 import json
 import logging
 
-from agents.adk_client import generate_multimodal, generate_multimodal_audio, make_agent, _run_agent_once
+from agents.adk_client import make_agent, _run_agent_once
 from agents.base import AgentInput, AgentOutput, BaseAgent
 from google.adk.agents import LlmAgent
 from google.genai.types import Part
