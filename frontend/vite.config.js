@@ -25,7 +25,9 @@ export default defineConfig({
         categories: ['government', 'social', 'utilities']
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,svg,png,ico,woff2}', 'index.html'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/map\.html/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
