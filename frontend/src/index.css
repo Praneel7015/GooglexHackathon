@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Base + brand tokens
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --mist:#f1e0c5;
+  --beige:#c9b79c;
+  --olive:#71816d;
+  --olive-dark:#5a6c56;
+  --coffee:#342a21;
+  --ink:#1a1614;
+  --paper:#fbf8f1;
+  --line:#2a221b;
+  --sand:#e6e0d2;
+  --rust:#c95a3c;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--sand);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+/* hide scrollbars on touch surfaces but keep scrolling */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Sketchy primitives — used by Card / Button when "sketchy" variant selected
+   ────────────────────────────────────────────────────────────────────────── */
+.box {
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  position: relative;
+}
+.box-dash { border-style: dashed; }
+.fill-mist   { background: var(--mist); }
+.fill-beige  { background: var(--beige); }
+.fill-olive  { background: var(--olive); color: var(--mist); }
+.fill-coffee { background: var(--coffee); color: var(--mist); }
+
+/* hand-drawn underline */
+.ul-strk {
+  background: linear-gradient(to right, var(--olive) 0, var(--olive) 100%) no-repeat left bottom / 100% 4px;
+  padding-bottom: 2px;
+}
+
+/* placeholder cross-hatched image */
+.img-x {
+  position: relative;
+  background: repeating-linear-gradient(45deg, #f0eadf 0 6px, #fbf8f1 6px 12px);
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+}
+
+/* paper texture underneath everything (subtle) */
+.paper-grain {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(rgba(52,42,33,.04) 1px, transparent 1px),
+    radial-gradient(rgba(52,42,33,.03) 1px, transparent 1px);
+  background-size: 12px 12px, 22px 22px;
+  background-position: 0 0, 6px 11px;
+}
+
+/* phone frame inset highlight */
+.phone-frame {
+  border-radius: 36px;
+  border: 2px solid var(--line);
+  box-shadow: inset 0 0 0 6px var(--paper), 0 24px 60px rgba(52,42,33,.18);
+  background: var(--paper);
+}
+
+/* leaflet warm overlay reused from wireframes */
+.leaflet-container { background: var(--mist); font-family: 'Inter', sans-serif; }
+
+/* focus ring */
+*:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; border-radius: 4px; }
+
+/* prevent FOUC for hand fonts */
+.font-hand, .font-sketch { -webkit-font-smoothing: subpixel-antialiased; }
+
+/* status bar bleed for installed PWA */
+@supports (padding: max(0px)) {
+  .pt-safe { padding-top: max(env(safe-area-inset-top), 0.5rem); }
+  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+}
