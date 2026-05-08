@@ -1,0 +1,12 @@
+[
+  {"ward_number": 95, "officer_name": "Ramesh Kumar", "email": "ward95@bbmp.gov.in", "phone": "+919900000095"},
+  {"ward_number": 96, "officer_name": "Suresh Babu", "email": "ward96@bbmp.gov.in", "phone": "+919900000096"},
+  {"ward_number": 97, "officer_name": "Priya Sharma", "email": "ward97@bbmp.gov.in", "phone": "+919900000097"},
+  {"ward_number": 110, "officer_name": "Deepak Raj", "email": "ward110@bbmp.gov.in", "phone": "+919900000110"},
+  {"ward_number": 111, "officer_name": "Kavitha Murthy", "email": "ward111@bbmp.gov.in", "phone": "+919900000111"},
+  {"ward_number": 150, "officer_name": "Anand Gowda", "email": "ward150@bbmp.gov.in", "phone": "+919900000150"},
+  {"ward_number": 151, "officer_name": "Lakshmi Devi", "email": "ward151@bbmp.gov.in", "phone": "+919900000151"},
+  {"ward_number": 174, "officer_name": "Venkatesh N", "email": "ward174@bbmp.gov.in", "phone": "+919900000174"},
+  {"ward_number": 87, "officer_name": "Manjunath H", "email": "ward87@bbmp.gov.in", "phone": "+919900000087"},
+  {"ward_number": 44, "officer_name": "Fatima Begum", "email": "ward44@bbmp.gov.in", "phone": "+919900000044"}
+]

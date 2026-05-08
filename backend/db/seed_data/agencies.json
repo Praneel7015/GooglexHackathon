@@ -1,0 +1,56 @@
+[
+  {
+    "name": "BBMP",
+    "twitter_handle": "@BBMPCOMM",
+    "email_pattern": "jc.{zone}@bbmp.gov.in",
+    "jurisdiction": ["roads", "garbage", "parks", "drainage", "building_violations", "electrical", "health", "footpath", "encroachment", "tree_fall"]
+  },
+  {
+    "name": "BESCOM",
+    "twitter_handle": "@bescomofficial",
+    "email_pattern": "helpdesk@bescom.co.in",
+    "jurisdiction": ["electricity", "broken_poles", "dangerous_wires", "power_outage", "streetlight"]
+  },
+  {
+    "name": "BWSSB",
+    "twitter_handle": "@bwssb_official",
+    "email_pattern": "comp@bwssb.gov.in",
+    "jurisdiction": ["water_leak", "sewage_overflow", "broken_pipes", "water_supply"]
+  },
+  {
+    "name": "BMTC",
+    "twitter_handle": "@BMTC_BENGALURU",
+    "email_pattern": "mdbmtc@gmail.com",
+    "jurisdiction": ["bus_stop_damage", "missed_buses", "conductor_issues"]
+  },
+  {
+    "name": "Bangalore Traffic Police",
+    "twitter_handle": "@blrcitytraffic",
+    "email_pattern": "addlcptraffic-blr@ksp.gov.in",
+    "jurisdiction": ["traffic_signal", "traffic_violations"]
+  },
+  {
+    "name": "KSPCB",
+    "twitter_handle": null,
+    "email_pattern": "mail@kspcb.gov.in",
+    "jurisdiction": ["air_pollution", "water_pollution", "noise_pollution", "lake_pollution"]
+  },
+  {
+    "name": "BMRCL",
+    "twitter_handle": "@OfficialBMRCL",
+    "email_pattern": "info@bmrc.co.in",
+    "jurisdiction": ["metro_issues"]
+  },
+  {
+    "name": "RERA Karnataka",
+    "twitter_handle": null,
+    "email_pattern": "secy-rera@karnataka.gov.in",
+    "jurisdiction": ["builder_fraud", "real_estate_disputes"]
+  },
+  {
+    "name": "Karnataka Forest Dept",
+    "twitter_handle": "@aranya_kfd",
+    "email_pattern": null,
+    "jurisdiction": ["illegal_tree_cutting", "forest_encroachment"]
+  }
+]
