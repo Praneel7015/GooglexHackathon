@@ -21,9 +21,17 @@ from config import settings
 
 logger = logging.getLogger("nammacity.adk_client")
 
-# Ensure ADK can find the API key
-if settings.gemini_api_key and not os.environ.get("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
+# Ensure ADK can find the API key.
+# Precedence:
+# 1. Existing GOOGLE_API_KEY in the environment
+# 2. settings.gemini_api_key
+# 3. settings.google_api_key
+_adk_google_api_key = (
+    settings.gemini_api_key
+    or getattr(settings, "google_api_key", None)
+)
+if _adk_google_api_key and not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = _adk_google_api_key
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 EMBED_MODEL = "text-embedding-004"
