@@ -125,6 +125,43 @@ async def generate_multimodal(
     raise last_error
 
 
+async def generate_multimodal_json(
+    prompt: str,
+    image_bytes: bytes,
+    response_schema: dict,
+    model: str | None = None,
+) -> str:
+    """Generate structured JSON from prompt + image with auto-fallback."""
+    chain = [model] if model else MULTIMODAL_FALLBACK_CHAIN
+    client = get_client()
+    last_error = None
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+
+    for m in chain:
+        try:
+            start = time.perf_counter()
+            response = client.models.generate_content(
+                model=m,
+                contents=[prompt, image_part],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=response_schema,
+                    http_options=types.HttpOptions(timeout=DEFAULT_TIMEOUT * 1000),
+                ),
+            )
+            latency = (time.perf_counter() - start) * 1000
+            _log_usage(m, latency, response)
+            return response.text or ""
+        except (ClientError, ServerError) as e:
+            last_error = e
+            if _is_rate_limit(e) and m != chain[-1]:
+                logger.warning("Rate limited on %s (JSON), falling back to next model", m)
+                continue
+            raise
+
+    raise last_error
+
+
 async def embed_text(
     text: str,
     model: str = "gemini-embedding-001",

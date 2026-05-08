@@ -6,7 +6,7 @@ import { useT } from '../lib/i18n';
 export default function Crowd() {
   const T = useT();
   const navigate = useNavigate();
-  const bundleSize = useApp(s => s.current.bundleSize) || 37;
+  const bundleSize = useApp(s => s.current.bundleSize) || 0;
   const total = bundleSize + 1;
 
   return (

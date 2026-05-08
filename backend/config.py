@@ -6,8 +6,9 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
-    # Gemini
+    # Gemini / ADK (GOOGLE_API_KEY is the canonical name ADK reads)
     gemini_api_key: str = ""
+    google_api_key: str = ""
 
     # Qdrant
     qdrant_url: str = ""

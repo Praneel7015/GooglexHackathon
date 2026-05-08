@@ -44,18 +44,42 @@ def load_ward_boundaries() -> list[dict]:
 
 
 def _demo_wards() -> list[dict]:
-    """5 hardcoded wards near MSRIT for demo/testing."""
+    """Hardcoded wards covering major Bangalore areas for demo."""
     return [
+        {"ward_number": 4, "name": "Yelahanka", "zone": "Yelahanka",
+         "mla": "Yelahanka", "bbox": [77.56, 13.08, 77.62, 13.12]},
+        {"ward_number": 18, "name": "Hebbal", "zone": "Yelahanka",
+         "mla": "Hebbal", "bbox": [77.57, 13.02, 77.62, 13.06]},
+        {"ward_number": 44, "name": "Peenya", "zone": "Dasarahalli",
+         "mla": "Dasarahalli", "bbox": [77.49, 13.01, 77.54, 13.05]},
+        {"ward_number": 80, "name": "Shivajinagar", "zone": "East",
+         "mla": "Shivajinagar", "bbox": [77.59, 12.97, 77.62, 13.00]},
+        {"ward_number": 86, "name": "Mahadevapura", "zone": "Mahadevapura",
+         "mla": "Mahadevapura", "bbox": [77.68, 12.96, 77.72, 13.00]},
         {"ward_number": 95, "name": "Malleshwaram", "zone": "West",
-         "mla": "Rajarajeshwari Nagar", "bbox": [77.55, 12.97, 77.58, 13.00]},
+         "mla": "Malleshwaram", "bbox": [77.55, 12.97, 77.58, 13.00]},
         {"ward_number": 96, "name": "Rajajinagar", "zone": "West",
          "mla": "Rajajinagar", "bbox": [77.53, 12.96, 77.56, 12.99]},
-        {"ward_number": 97, "name": "Subramanyanagar", "zone": "West",
-         "mla": "Rajajinagar", "bbox": [77.54, 12.95, 77.57, 12.98]},
-        {"ward_number": 110, "name": "Yeshwanthpur", "zone": "North",
+        {"ward_number": 110, "name": "Yeshwanthpur", "zone": "West",
          "mla": "Yeshwanthpur", "bbox": [77.53, 12.99, 77.56, 13.02]},
-        {"ward_number": 44, "name": "Hebbal", "zone": "North",
-         "mla": "Hebbal", "bbox": [77.57, 13.02, 77.60, 13.05]},
+        {"ward_number": 118, "name": "Indiranagar", "zone": "East",
+         "mla": "Shantinagar", "bbox": [77.63, 12.97, 77.66, 13.00]},
+        {"ward_number": 126, "name": "Jayanagar", "zone": "South",
+         "mla": "Jayanagar", "bbox": [77.58, 12.92, 77.61, 12.95]},
+        {"ward_number": 134, "name": "BTM Layout", "zone": "Bommanahalli",
+         "mla": "BTM Layout", "bbox": [77.60, 12.90, 77.63, 12.93]},
+        {"ward_number": 145, "name": "Whitefield", "zone": "Mahadevapura",
+         "mla": "Mahadevapura", "bbox": [77.73, 12.95, 77.77, 12.99]},
+        {"ward_number": 150, "name": "HSR Layout", "zone": "Bommanahalli",
+         "mla": "Bommanahalli", "bbox": [77.63, 12.90, 77.66, 12.93]},
+        {"ward_number": 151, "name": "Koramangala", "zone": "South",
+         "mla": "BTM Layout", "bbox": [77.61, 12.93, 77.64, 12.96]},
+        {"ward_number": 167, "name": "Banashankari", "zone": "South",
+         "mla": "Basavanagudi", "bbox": [77.56, 12.91, 77.59, 12.94]},
+        {"ward_number": 174, "name": "JP Nagar", "zone": "South",
+         "mla": "Jayanagar", "bbox": [77.57, 12.89, 77.60, 12.92]},
+        {"ward_number": 188, "name": "Bommanahalli", "zone": "Bommanahalli",
+         "mla": "Bommanahalli", "bbox": [77.61, 12.88, 77.64, 12.91]},
     ]
 
 
