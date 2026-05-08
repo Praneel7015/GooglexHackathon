@@ -4,17 +4,14 @@ Replaces raw google-genai calls with Google ADK LlmAgent-backed inference.
 Exposes generate_text, generate_multimodal, and embed_text used by all agents.
 """
 
-import base64
 import logging
 import os
 import time
-from typing import Any
 
 from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool
-from google.genai import types as genai_types
 from google.genai.types import Content, Part
 
 from config import settings
