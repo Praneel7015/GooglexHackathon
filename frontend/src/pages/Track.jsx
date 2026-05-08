@@ -1,16 +1,31 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Card, Chip } from '../components/ui';
 import { useApp } from '../lib/store';
+import { api } from '../lib/api';
 import { useT } from '../lib/i18n';
 
 export default function Track() {
   const T = useT();
   const { id } = useParams();
   const filed = useApp(s => s.filed);
-  const item = filed.find(c => c.id === id) || filed[0];
-  const headerId = item?.id || 'NMC-2467';
-  const issue = item?.issue || 'Pothole';
-  const ward = item?.wardName || 'Yelahanka Main Rd';
+
+  const [liveDetail, setLiveDetail] = useState(null);
+  const [liveList, setLiveList] = useState(null);
+
+  useEffect(() => {
+    if (id) {
+      api.getComplaint(id).then(data => { if (data) setLiveDetail(data); });
+    }
+    api.listComplaints({ limit: 20 }).then(data => { if (data) setLiveList(data.complaints); });
+  }, [id]);
+
+  const localItem = filed.find(c => c.id === id) || filed[0];
+
+  const headerId = liveDetail?.id?.slice(0, 13) || localItem?.id || 'NMC-2467';
+  const issue = liveDetail?.issue_type?.replace(/_/g, ' ') || localItem?.issue || 'Pothole';
+  const ward = liveDetail?.location?.ward_name || localItem?.wardName || 'Yelahanka Main Rd';
+  const severity = liveDetail?.severity || localItem?.severity || 4;
 
   const DEFAULT_STEPS = [
     { day: 0,  label: 'Filed · BBMP Roads',                status: 'sent' },
@@ -21,7 +36,18 @@ export default function Track() {
     { day: 30, label: 'Public dashboard auto-elevation',   status: 'queued' }
   ];
 
-  const steps = item?.timeline || DEFAULT_STEPS;
+  const steps = liveDetail?.escalation?.timeline
+    ? liveDetail.escalation.timeline.map(t => ({
+        day: t.stage === 'submitted' ? 0 : t.stage === 'councillor_tagged' ? 7 :
+             t.stage === 'rti_filed' ? 14 : t.stage === 'mla_tagged' ? 21 : 30,
+        label: t.action,
+        status: t.completed ? 'sent' : (liveDetail.escalation.current_stage === t.stage ? 'active' : 'queued'),
+      }))
+    : (localItem?.timeline || DEFAULT_STEPS);
+
+  const otherComplaints = liveList
+    ? liveList.filter(c => c.id !== (liveDetail?.id || id)).slice(0, 5)
+    : filed.filter(c => c.id !== localItem?.id);
 
   return (
     <div className="max-w-md mx-auto p-4 md:p-6">
@@ -29,7 +55,7 @@ export default function Track() {
         <span className="font-mono text-[11px] text-coffee/65">{headerId}</span>
         <Chip tone="olive">{T('tr.active')}</Chip>
       </div>
-      <h1 className="font-hand text-coffee text-2xl leading-tight">{issue} · {ward} · Severity {item?.severity || 4}</h1>
+      <h1 className="font-hand text-coffee text-2xl leading-tight">{issue} · {ward} · Severity {severity}</h1>
 
       <Card tone="mist" padding="p-3" className="mt-3">
         <div className="text-[9px] uppercase tracking-wider font-sans text-coffee/65">{T('tr.likelihood')}</div>
@@ -42,26 +68,22 @@ export default function Track() {
 
       <div className="relative mt-5 px-1">
         {steps.map((s, i) => {
-          const status = s.status; // 'sent', 'active', 'queued'
+          const status = s.status;
           const done = status === 'sent';
           const active = status === 'active';
           const isLast = i === steps.length - 1;
 
           return (
             <div key={i} className={`flex gap-4 items-stretch transition-opacity duration-300 ${status === 'queued' ? 'opacity-55' : 'opacity-100'}`}>
-              {/* Timeline column */}
               <div className="w-5 flex flex-col items-center relative">
-                {/* Line segment */}
                 {!isLast && (
-                  <div className={['absolute top-5 bottom-0 w-[2px] rounded-full transition-colors duration-500', 
+                  <div className={['absolute top-5 bottom-0 w-[2px] rounded-full transition-colors duration-500',
                     done ? 'bg-olive' : 'bg-line/20'].join(' ')} />
                 )}
-                
-                {/* Circle */}
                 <div className="z-10 bg-paper py-1">
                   <span className={['flex items-center justify-center w-[18px] h-[18px] rounded-full border-[2px] transition-colors duration-300',
-                    done ? 'bg-olive border-olive text-mist' : 
-                    active ? 'bg-paper border-olive shadow-[0_0_0_4px_rgba(113,129,109,.15)] animate-pulse-soft' : 
+                    done ? 'bg-olive border-olive text-mist' :
+                    active ? 'bg-paper border-olive shadow-[0_0_0_4px_rgba(113,129,109,.15)] animate-pulse-soft' :
                     'bg-paper border-line/40'
                   ].join(' ')}>
                     {done && (
@@ -72,8 +94,6 @@ export default function Track() {
                   </span>
                 </div>
               </div>
-
-              {/* Content column */}
               <div className="flex-1 pb-6 pt-1">
                 <div className={['font-sans text-[12.5px] font-semibold transition-colors', active ? 'text-coffee' : 'text-coffee/70'].join(' ')}>
                   Day {s.day} · {s.label}
@@ -92,16 +112,16 @@ export default function Track() {
 
       <Link to="/dashboard" className="block mt-6 font-sans text-[12px] text-olive font-semibold underline">{T('tr.dashboard')}</Link>
 
-      {filed.length > 1 && (
+      {otherComplaints.length > 0 && (
         <div className="mt-8">
           <Chip>{T('tr.others')}</Chip>
           <ul className="mt-2 space-y-1">
-            {filed.filter(c => c.id !== item?.id).map(c => (
+            {otherComplaints.map(c => (
               <li key={c.id}>
                 <Link to={`/track/${c.id}`} className="grid grid-cols-[80px_1fr_60px] gap-2 py-1 text-[11.5px] font-sans hover:bg-mist rounded px-1.5">
-                  <span className="font-mono text-olive">{c.id}</span>
-                  <span className="text-coffee">{c.issue}</span>
-                  <span className="font-mono text-[10px] text-coffee/55 text-right">sev {c.severity}</span>
+                  <span className="font-mono text-olive">{(c.id || '').slice(0, 8)}</span>
+                  <span className="text-coffee">{(c.issue_type || c.issue || '').replace(/_/g, ' ')}</span>
+                  <span className="font-mono text-[10px] text-coffee/55 text-right">sev {c.severity || '?'}</span>
                 </Link>
               </li>
             ))}

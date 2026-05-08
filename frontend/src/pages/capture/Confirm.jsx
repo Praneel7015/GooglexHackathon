@@ -2,15 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PhoneFrame, Card, Button } from '../../components/ui';
 import { useApp } from '../../lib/store';
-import { runSubmission } from '../../lib/agents';
 import { useT } from '../../lib/i18n';
-
-const CHANNELS = [
-  { key: 'twitter',  label: 'Twitter',     hint: '@BBMPCOMM' },
-  { key: 'email',    label: 'Email',       hint: 'PWD escalation desk' },
-  { key: 'portal',   label: 'BBMP portal', hint: 'pre-filled · awaiting submit' },
-  { key: 'whatsapp', label: 'WhatsApp',    hint: 'councillor' }
-];
 
 export default function Confirm() {
   const T = useT();
@@ -20,14 +12,53 @@ export default function Confirm() {
   const navigate = useNavigate();
   const bundleN = cur.bundleSize || 0;
 
+  // Drive channel status from real backend response (set in Agents.jsx)
+  const backendSub = cur.backendResult?.submission;
+  const backendChannels = backendSub?.submitted_channels || [];
+
   useEffect(() => {
-    const cancel = runSubmission(cur, (k) => patchChannel(k, true));
-    return cancel;
-  }, [cur, patchChannel]);
+    if (backendChannels.length > 0) {
+      // Real backend data — show channels as they were dispatched
+      let i = 0;
+      const timer = setInterval(() => {
+        if (i >= backendChannels.length) { clearInterval(timer); return; }
+        const ch = backendChannels[i];
+        const key = ch.channel === 'email' ? 'email' :
+                    ch.channel === 'twitter' ? 'twitter' :
+                    ch.channel === 'whatsapp' ? 'whatsapp' : 'portal';
+        patchChannel(key, ch.status === 'success');
+        i++;
+      }, 500);
+      return () => clearInterval(timer);
+    } else {
+      // Fallback: mark all as done after 2s (mock mode)
+      const t = setTimeout(() => {
+        ['twitter', 'email', 'portal', 'whatsapp'].forEach(k => patchChannel(k, true));
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [backendChannels, patchChannel]);
+
+  // Derive channel display from backend data
+  const twitterHandle = cur.backendResult?.routing?.twitter_handle || '@BBMPCOMM';
+  const officerEmail = cur.backendResult?.routing?.ward_officer?.email || 'ward officer';
+  const subStatus = backendSub?.status;
+
+  const CHANNELS = [
+    { key: 'twitter',  label: 'Twitter',     hint: twitterHandle,
+      mode: backendChannels.find(c => c.channel === 'twitter')?.mode },
+    { key: 'email',    label: 'Email',       hint: officerEmail,
+      mode: backendChannels.find(c => c.channel === 'email')?.mode },
+    { key: 'portal',   label: 'BBMP portal', hint: 'pre-filled',
+      mode: 'stub' },
+    { key: 'whatsapp', label: 'WhatsApp',    hint: 'councillor',
+      mode: backendChannels.find(c => c.channel === 'whatsapp')?.mode },
+  ];
 
   const goTrack = () => {
     const filed = fileCurrent();
-    navigate(`/track/${filed.id}`);
+    const trackId = cur.backendResult?.complaint_id || filed.id;
+    navigate(`/track/${trackId}`);
   };
 
   return (
@@ -36,6 +67,9 @@ export default function Confirm() {
         <div className="text-center mt-1">
           <div className="w-12 h-12 rounded-full bg-olive border-[1.5px] border-line mx-auto mb-2.5 flex items-center justify-center text-mist text-2xl animate-pop-in">✓</div>
           <h1 className="font-hand text-coffee text-[24px] leading-tight whitespace-pre-line">{T('conf.filed', { n: bundleN })}</h1>
+          {subStatus === 'suppressed' && (
+            <div className="font-sans text-[10px] text-coffee/65 mt-1">Joined existing cluster · next notification at milestone</div>
+          )}
         </div>
 
         <Card padding="p-0" tone="mist" className="mt-3 h-24 overflow-hidden relative">
@@ -56,10 +90,11 @@ export default function Confirm() {
         <div className="space-y-1.5">
           {CHANNELS.map(c => {
             const sent = !!cur.channels[c.key];
+            const modeLabel = c.mode === 'stub' ? ' (stub)' : '';
             return (
               <Card key={c.key} padding="px-2.5 py-1.5" className="flex items-center gap-2">
                 <span className={'w-2 h-2 rounded-full ' + (sent ? 'bg-olive' : 'bg-beige animate-pulse-soft')} />
-                <span className="font-sans text-[11px] font-semibold text-coffee">{c.label}</span>
+                <span className="font-sans text-[11px] font-semibold text-coffee">{c.label}{modeLabel}</span>
                 <span className="font-mono text-[10px] text-coffee/65">{c.hint}</span>
                 <span className={'ml-auto font-sans text-[11px] font-semibold ' + (sent ? 'text-olive' : 'text-coffee/55')}>{sent ? '✓' : '…'}</span>
               </Card>

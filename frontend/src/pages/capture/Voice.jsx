@@ -29,9 +29,7 @@ export default function Voice() {
   const patch = useApp(s => s.patchCurrent);
 
   useEffect(() => {
-    if (!cur.transcript) {
-      patch({ transcript: 'Big pothole on Yelahanka main road, two-wheelers swerving every few seconds.' });
-    }
+    // No hardcoded transcript — backend will classify from photo
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());

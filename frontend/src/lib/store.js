@@ -59,7 +59,7 @@ export const useApp = create(persist((set, get) => ({
     current: {
       id: null, photo: null, photoTime: null, voiceBlob: null, voiceDuration: 0,
       transcript: '', issue: 'Pothole', severity: 4, agencyCode: 'BBMP-ROADS',
-      ward: 95, gps: [13.0995, 77.5963], bundleSize: 0, nearby: [],
+      ward: null, gps: null, bundleSize: 0, nearby: [], backendResult: null,
       submittedAt: null,
       channels: { twitter: false, email: false, portal: false, whatsapp: false }
     }
