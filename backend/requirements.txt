@@ -11,6 +11,3 @@ pydantic-settings
 pillow
 tweepy
 tenacity
-pytest
-pytest-asyncio
-httpx

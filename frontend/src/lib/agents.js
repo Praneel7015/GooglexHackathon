@@ -40,9 +40,9 @@ export function runPipeline(complaint, { onStage, onDone, perStageMs = 900 }) {
 function stageOutput(key, c) {
   switch (key) {
     case 'reporter':
-      return `Captured · ${c.issue || 'pothole'} · severity ${c.severity || 4}`;
+      return `Captured · ${c.issue || 'analyzing...'} · severity ${c.severity || '?'}`;
     case 'geo':
-      return `Mapped to Ward ${c.ward || 95} · ${c.gps ? c.gps.map(n => n.toFixed(3)).join(', ') : 'GPS missing → vision fallback'}`;
+      return `Mapped to Ward ${c.ward || '?'} · ${c.gps ? c.gps.map(n => n.toFixed(3)).join(', ') : 'locating...'}`;
     case 'routing': {
       const agency = AGENCIES.find(a => a.code === (c.agencyCode || ROUTING[c.issue])) || AGENCIES[0];
       return `${agency.name} · ${agency.handle || agency.email}`;
@@ -50,7 +50,7 @@ function stageOutput(key, c) {
     case 'crowd': {
       const nearby = findNearby({
         ll: c.gps || [13.0995, 77.5963],
-        issue: c.issue || 'Pothole',
+        issue: c.issue || 'unknown',
         id: c.id || 'NEW'
       });
       return `Bundling ${nearby.length} nearby reports · joint complaint forming`;

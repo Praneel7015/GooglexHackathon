@@ -1,25 +1,62 @@
 import BangaloreMap from '../components/BangaloreMap';
 import { Card, Chip, Logo } from '../components/ui';
 import { aggregateStats, COMPLAINTS, WARDS } from '../lib/seed';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useT } from '../lib/i18n';
+import { api } from '../lib/api';
 
 export default function Dashboard() {
   const T = useT();
-  const stats = aggregateStats();
   const [filter, setFilter] = useState('All');
-  const recent = [...COMPLAINTS].sort((a, b) => a.ageDays - b.ageDays).slice(0, 8);
+
+  // Real data from backend (falls back to seed if backend unavailable)
+  const [liveStats, setLiveStats] = useState(null);
+  const [liveComplaints, setLiveComplaints] = useState(null);
+
+  useEffect(() => {
+    api.getDashboardStats().then(data => { if (data) setLiveStats(data); });
+    api.listComplaints({ limit: 8 }).then(data => { if (data) setLiveComplaints(data.complaints); });
+  }, []);
+
+  // Use backend data if available, else fall back to seed
+  const stats = liveStats ? {
+    open: liveStats.totals?.total_open ?? 0,
+    resolvedPct: liveStats.totals?.total_complaints
+      ? Math.round((liveStats.totals.total_resolved / liveStats.totals.total_complaints) * 100)
+      : 0,
+    wardsReporting: (liveStats.wards || []).length,
+    medianFirstResponse: liveStats.totals?.avg_resolution_days ?? 7.2,
+  } : aggregateStats();
+
+  const wards = liveStats?.wards?.length
+    ? liveStats.wards.map(w => ({
+        id: w.ward_number,
+        name: w.ward_name,
+        resolution: w.resolution_rate,
+        open: w.open,
+        tone: w.resolution_rate >= 0.65 ? 'olive' : w.resolution_rate >= 0.4 ? 'beige' : 'coffee',
+      }))
+    : WARDS;
+
+  const recent = liveComplaints
+    ? liveComplaints.map(c => ({
+        id: c.id?.slice(0, 8) || 'NMC-?',
+        issue: (c.issue_type || '').replace(/_/g, ' '),
+        wardName: c.ward_name || '',
+        status: c.status || 'open',
+      }))
+    : [...COMPLAINTS].sort((a, b) => a.ageDays - b.ageDays).slice(0, 8);
 
   return (
     <div className="bg-paper min-h-[calc(100vh-60px)]">
       {/* stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-b border-line">
         {[
-          [stats.open.toLocaleString(),         T('stat.open'),      'beige'],
-          [`${stats.resolvedPct}%`,              T('stat.resolved') + ' < 30 days', 'olive'],
-          [String(stats.wardsReporting),         T('stat.wards') + ' reporting',    'paper'],
-          [`${stats.medianFirstResponse} days`,  'median first response',            'paper']
+          [String(stats.open).toLocaleString(),   T('stat.open'),      'beige'],
+          [`${stats.resolvedPct}%`,                T('stat.resolved') + ' < 30 days', 'olive'],
+          [String(stats.wardsReporting),           T('stat.wards') + ' reporting',    'paper'],
+          [`${stats.medianFirstResponse} days`,    'median first response',            'paper']
         ].map(([n, l, tone], i) => (
           <div key={i} className={[
             'p-4 md:p-5 border-r border-line last:border-r-0',
@@ -78,7 +115,7 @@ export default function Dashboard() {
             ))}
           </div>
           <ul className="space-y-1">
-            {WARDS.map((w, i) => (
+            {wards.map((w, i) => (
               <li key={w.id}>
                 <Link to={`/officer/${w.id}`} className="grid grid-cols-[24px_1fr_60px_44px] gap-2 items-center px-2 py-1.5 rounded hover:bg-mist text-[12px] font-sans">
                   <span className="font-mono text-coffee/55">{i + 1}</span>
@@ -89,11 +126,11 @@ export default function Dashboard() {
                         'absolute inset-y-0 left-0',
                         w.tone === 'olive' ? 'bg-olive' : w.tone === 'beige' ? 'bg-beige' : 'bg-coffee'
                       ].join(' ')}
-                      style={{ width: `${Math.round(w.resolution * 100)}%` }}
+                      style={{ width: `${Math.round((w.resolution || 0) * 100)}%` }}
                     />
                   </div>
                   <span className={`font-mono text-right ${w.tone === 'olive' ? 'text-olive font-semibold' : w.tone === 'coffee' ? 'text-coffee font-semibold' : 'text-coffee/65'}`}>
-                    {Math.round(w.resolution * 100)}%
+                    {Math.round((w.resolution || 0) * 100)}%
                   </span>
                 </Link>
               </li>

@@ -29,9 +29,7 @@ export default function Voice() {
   const patch = useApp(s => s.patchCurrent);
 
   useEffect(() => {
-    if (!cur.transcript) {
-      patch({ transcript: 'Big pothole on Yelahanka main road, two-wheelers swerving every few seconds.' });
-    }
+    // No hardcoded transcript — backend will classify from photo
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -94,9 +92,10 @@ export default function Voice() {
 
         <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/55 mb-1">{T('cap.autoclass')}</div>
         <div className="flex gap-1.5 flex-wrap">
-          <Chip tone="olive">{cur.issue}</Chip>
-          <Chip tone="coffee">Severity {cur.severity}</Chip>
-          <Chip dashed>{cur.agencyCode}</Chip>
+          <Chip tone="olive">{cur.issue ? cur.issue.replace(/_/g, ' ') : 'will auto-detect from photo'}</Chip>
+          {cur.severity && <Chip tone="coffee">Severity {cur.severity}</Chip>}
+          {cur.agencyCode && <Chip dashed>{cur.agencyCode}</Chip>}
+          {!cur.issue && <Chip dashed>AI classifies on next step</Chip>}
         </div>
 
         <StepFooter back={() => navigate('/capture')} primary={() => navigate('/agents')} />

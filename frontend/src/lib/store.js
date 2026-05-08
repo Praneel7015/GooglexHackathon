@@ -7,7 +7,7 @@ export const useApp = create(persist((set, get) => ({
   language: 'EN', // 'EN' | 'KN' | 'HI' | 'TA'
   onboarded: false,
   channels: {
-    email:    { connected: true,  value: 'sneha.r@gmail.com' },
+    email:    { connected: false, value: '' },
     twitter:  { connected: false, value: '' },
     whatsapp: { connected: false, value: '' },
     phone:    { connected: false, value: '' },
@@ -18,7 +18,7 @@ export const useApp = create(persist((set, get) => ({
     autoTweet7d:  true,
     fileAnonymous:false
   },
-  user: { name: 'Sneha Reddy', id: '1A-9381', wardId: 95 },
+  user: { name: '', id: null, wardId: null },
 
   // ── In-flight complaint ───────────────────────────────────────────
   current: {
@@ -28,9 +28,9 @@ export const useApp = create(persist((set, get) => ({
     voiceBlob:  null,
     voiceDuration: 0,
     transcript: '',
-    issue:      'Pothole',
-    severity:   4,
-    agencyCode: 'BBMP-ROADS',
+    issue:      null,           // auto-classified by Reporter Agent
+    severity:   null,           // auto-classified by Reporter Agent
+    agencyCode: null,           // auto-routed by Routing Agent
     ward:       null,         // ward id
     gps:        null,         // [lat, lon]
     bundleSize: 0,
@@ -58,8 +58,8 @@ export const useApp = create(persist((set, get) => ({
   resetCurrent: () => set({
     current: {
       id: null, photo: null, photoTime: null, voiceBlob: null, voiceDuration: 0,
-      transcript: '', issue: 'Pothole', severity: 4, agencyCode: 'BBMP-ROADS',
-      ward: 95, gps: [13.0995, 77.5963], bundleSize: 0, nearby: [],
+      transcript: '', issue: null, severity: null, agencyCode: null,
+      ward: null, gps: null, bundleSize: 0, nearby: [], backendResult: null,
       submittedAt: null,
       channels: { twitter: false, email: false, portal: false, whatsapp: false }
     }
@@ -73,19 +73,32 @@ export const useApp = create(persist((set, get) => ({
 
   fileCurrent: () => {
     const { current, filed } = get();
-    const id = current.id || `NMC-${2000 + filed.length}`;
+    // Use real backend complaint_id if available
+    const id = current.backendResult?.complaint_id || current.id || `NMC-${2000 + filed.length}`;
+
+    // Build timeline from backend escalation if available, else default
+    const backendTimeline = current.backendResult?.escalation?.timeline;
+    const timeline = backendTimeline
+      ? backendTimeline.map(t => ({
+          day: t.stage === 'submitted' ? 0 : t.stage === 'councillor_tagged' ? 7 :
+               t.stage === 'rti_filed' ? 14 : t.stage === 'mla_tagged' ? 21 : 30,
+          label: t.action,
+          status: t.completed ? 'sent' : 'queued',
+        }))
+      : [
+          { day: 0,  label: `Filed · ${current.agencyCode || 'BBMP'}`, status: 'sent' },
+          { day: 3,  label: 'Twitter escalation · @BBMPCOMM', status: 'sent' },
+          { day: 7,  label: 'Cc Ward Engineer', status: 'active' },
+          { day: 14, label: 'CC councillor + RTI draft', status: 'queued' },
+          { day: 21, label: 'Press alert · The Hindu civic desk', status: 'queued' },
+          { day: 30, label: 'Public dashboard auto-elevation', status: 'queued' },
+        ];
+
     const filedItem = {
       ...current,
       id,
       submittedAt: Date.now(),
-      timeline: [
-        { day: 0,  label: `Filed · ${current.agencyCode}`, status: 'sent' },
-        { day: 3,  label: 'Twitter escalation · @BBMPCOMM', status: 'sent' },
-        { day: 7,  label: 'Cc Ward Engineer', status: 'active' },
-        { day: 14, label: 'CC councillor + RTI draft', status: 'queued' },
-        { day: 21, label: 'Press alert · The Hindu civic desk', status: 'queued' },
-        { day: 30, label: 'Public dashboard auto-elevation', status: 'queued' }
-      ]
+      timeline,
     };
     set({ filed: [filedItem, ...filed], current: { ...current, id } });
     return filedItem;

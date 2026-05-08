@@ -1,21 +1,38 @@
+import { useState } from 'react';
 import { PhoneFrame, Card, Chip, Button } from '../components/ui';
 import { useApp } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../lib/i18n';
 
-const CHANNELS = [
-  { key: 'email',    label: 'Email',        hint: 'sneha.r@gmail.com' },
-  { key: 'twitter',  label: 'X / Twitter',  hint: 'tap to connect' },
-  { key: 'whatsapp', label: 'WhatsApp',     hint: 'tap to connect' },
-  { key: 'phone',    label: 'Phone number', hint: 'for SMS escalation' }
-];
-
 export default function Connect() {
   const T = useT();
   const channels = useApp(s => s.channels);
+  const user = useApp(s => s.user);
   const setChannel = useApp(s => s.setChannel);
+  const patchCurrent = useApp(s => s.patchCurrent);
   const navigate = useNavigate();
-  const anyConnected = Object.values(channels).some(c => c.connected);
+
+  const [name, setName] = useState(user.name || '');
+  const [email, setEmail] = useState(channels.email?.value || '');
+  const [editing, setEditing] = useState(!channels.email?.connected);
+
+  const handleSave = () => {
+    if (email && email.includes('@')) {
+      setChannel('email', { connected: true, value: email });
+      // Also update user name in store
+      useApp.setState(s => ({ user: { ...s.user, name: name || 'Citizen' } }));
+      setEditing(false);
+    }
+  };
+
+  const handleSkip = () => {
+    // Anonymous mode — no CC, no Reply-To
+    setChannel('email', { connected: false, value: '' });
+    useApp.setState(s => ({ user: { ...s.user, name: '' } }));
+    navigate('/capture');
+  };
+
+  const emailConnected = channels.email?.connected && channels.email?.value;
 
   return (
     <PhoneFrame>
@@ -29,37 +46,71 @@ export default function Connect() {
 
         <Chip>{T('conn.step')}</Chip>
         <h1 className="font-hand text-coffee text-[22px] leading-tight font-bold tracking-tight mt-1.5">
-          {T('conn.heading')}
+          Your identity on the complaint
         </h1>
-        <p className="font-sans text-[11.5px] text-coffee/75 leading-relaxed mb-4 mt-2">{T('conn.body')}</p>
+        <p className="font-sans text-[11.5px] text-coffee/75 leading-relaxed mb-4 mt-2">
+          Your email will be CC'd on the complaint to BBMP so they can reply directly to you. Your name appears in the formal letter.
+        </p>
 
-        <div className="space-y-2 flex-1 overflow-y-auto">
-          {CHANNELS.map(c => {
-            const conn = channels[c.key];
-            const done = conn?.connected;
-            return (
-              <Card key={c.key} tone={done ? 'mist' : 'paper'} padding="p-3"
-                className={'flex items-center gap-3 cursor-pointer ' + (done ? 'border-olive' : '')}
-                onClick={() => setChannel(c.key, { connected: !done, value: done ? '' : (conn?.value || c.hint) })}>
-                <span className={['w-6 h-6 rounded-full border-[1.4px] flex items-center justify-center font-sans font-bold text-[11px]',
-                  done ? 'bg-olive border-olive text-mist' : 'bg-transparent border-line text-coffee'].join(' ')}>{done ? '✓' : ''}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-sans font-semibold text-coffee text-[12px]">{c.label}</div>
-                  <div className={'font-mono text-[10px] truncate ' + (done ? 'text-olive' : 'text-coffee/55')}>{done ? conn.value : c.hint}</div>
-                </div>
-                <span className="font-sans text-[10px] text-olive font-semibold">{done ? T('conn.edit') : T('conn.connect')}</span>
+        <div className="space-y-3 flex-1">
+          {/* Name */}
+          <div>
+            <label className="font-sans text-[10px] uppercase tracking-wider text-coffee/55 mb-1 block">Your Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Ojasvi Poonia"
+              className="w-full bg-mist border border-line rounded px-3 py-2 font-sans text-[13px] text-coffee focus:outline-none focus:border-olive"
+            />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="font-sans text-[10px] uppercase tracking-wider text-coffee/55 mb-1 block">Your Email (for CC + Reply-To)</label>
+            {editing ? (
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="flex-1 bg-mist border border-line rounded px-3 py-2 font-sans text-[13px] text-coffee focus:outline-none focus:border-olive"
+                />
+                <button
+                  onClick={handleSave}
+                  disabled={!email || !email.includes('@')}
+                  className="px-3 py-2 bg-olive text-mist font-sans text-[11px] font-semibold rounded disabled:opacity-40"
+                >Save</button>
+              </div>
+            ) : (
+              <Card tone="mist" padding="px-3 py-2" className="flex items-center gap-2 cursor-pointer border-olive" onClick={() => setEditing(true)}>
+                <span className="w-5 h-5 rounded-full bg-olive text-mist flex items-center justify-center text-[10px] font-bold">✓</span>
+                <span className="font-mono text-[12px] text-olive flex-1">{channels.email?.value}</span>
+                <span className="font-sans text-[10px] text-coffee/55">edit</span>
               </Card>
-            );
-          })}
-        </div>
+            )}
+          </div>
 
-        <div className="font-hand text-center text-olive text-[13px] mt-3">
-          {anyConnected ? T('conn.ready') : T('conn.required')}
+          {/* How it works */}
+          <Card tone="mist" padding="px-3 py-2.5" className="mt-2">
+            <div className="font-sans text-[10px] uppercase tracking-wider text-coffee/55 mb-1">How it works</div>
+            <div className="font-sans text-[11px] text-coffee/75 leading-relaxed space-y-1">
+              <div>• Email goes <b>From:</b> NammaCity → <b>To:</b> BBMP ward officer</div>
+              <div>• You're <b>CC'd</b> so you see the complaint</div>
+              <div>• <b>Reply-To</b> set to your email so BBMP replies go to you</div>
+            </div>
+          </Card>
         </div>
 
         <div className="flex gap-2 mt-3">
-          <Button variant="secondary" onClick={() => navigate(-1)} className="flex-1">← {T('cta.back')}</Button>
-          <Button variant="primary" disabled={!anyConnected} onClick={() => navigate('/capture')} className="flex-[2]">{T('cta.continue')} →</Button>
+          <Button variant="secondary" onClick={handleSkip} className="flex-1">Skip (anonymous)</Button>
+          <Button
+            variant="primary"
+            disabled={!emailConnected}
+            onClick={() => navigate('/capture')}
+            className="flex-[2]"
+          >Continue →</Button>
         </div>
       </div>
     </PhoneFrame>

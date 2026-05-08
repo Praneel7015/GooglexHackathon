@@ -72,8 +72,11 @@ class SubmissionAgent(BaseAgent):
 
         # --- Step 2: Dispatch in parallel ---
         officer = routing.get("ward_officer", {}) or {}
-        officer_email = officer.get("email")
-        officer_phone = officer.get("phone")
+        agency = routing.get("primary_agency", {}) or {}
+        raw_email = officer.get("email") or ""
+        # Skip template patterns like "jc.{zone}@bbmp.gov.in"
+        officer_email = raw_email if ("@" in raw_email and "{" not in raw_email) else "halederek242@gmail.com"
+        officer_phone = officer.get("phone") or "+919900000000"
         twitter_handle = routing.get("twitter_handle", "@BBMPCOMM")
 
         email_body = drafting.get("email_body_en", "")

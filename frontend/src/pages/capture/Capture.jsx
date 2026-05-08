@@ -11,10 +11,21 @@ export default function Capture() {
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
   const navigate = useNavigate();
+  const cur = useApp(s => s.current);
   const patch = useApp(s => s.patchCurrent);
   const reset = useApp(s => s.resetCurrent);
 
   useEffect(() => { reset(); }, [reset]);
+
+  // Get real device GPS
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => patch({ gps: [pos.coords.latitude, pos.coords.longitude] }),
+      () => {} // silent fail — fallback stays as default
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,8 +62,8 @@ export default function Capture() {
     patch({
       photo: dataUrl,
       photoTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      gps: [13.0995, 77.5963],
-      ward: 95
+      gps: cur.gps || [12.9716, 77.5946],
+      ward: null
     });
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     navigate('/voice');
