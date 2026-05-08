@@ -150,9 +150,23 @@ async def report(
         })
     )
     if not reporter_result.success:
-        return JSONResponse(status_code=500, content={
-            "error": "reporter_failed", "message": reporter_result.error,
-        })
+        err = reporter_result.error or ""
+        is_quota = "429" in err or "RESOURCE_EXHAUSTED" in err or "quota" in err.lower()
+        if is_quota:
+            # LLM quota exhausted — continue pipeline with safe defaults
+            logger.warning("ReporterAgent quota-exhausted; continuing with fallback classification")
+            reporter_result.success = True
+            reporter_result.data = {
+                "issue_type": "other",
+                "severity": 3,
+                "spam_score": 0.0,
+                "raw_description": "Civic issue reported via NammaCity (LLM quota exhausted — auto-classified)",
+                "transcribed_text": "",
+            }
+        else:
+            return JSONResponse(status_code=500, content={
+                "error": "reporter_failed", "message": reporter_result.error,
+            })
 
     if reporter_result.data.get("spam_score", 0) > 0.95:
         return JSONResponse(status_code=422, content={

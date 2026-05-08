@@ -3,16 +3,33 @@
  * Falls back to null on network errors (frontend shows mock data as fallback).
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL
+  || import.meta.env.VITE_API_BASE_URL
+  || 'http://localhost:8000';
 
-async function safeFetch(url, opts = {}) {
+// Pipeline can take up to 60s (multiple Gemini calls in parallel)
+const REPORT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+async function safeFetch(url, opts = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, opts);
-    if (!res.ok) return null;
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    if (!res.ok) {
+      console.warn('[api] HTTP error:', res.status, url);
+      return null;
+    }
     return await res.json();
   } catch (e) {
-    console.warn('[api] fetch failed:', url, e.message);
+    if (e.name === 'AbortError') {
+      console.warn('[api] request timed out:', url);
+    } else {
+      console.warn('[api] fetch failed:', url, e.message);
+    }
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -27,7 +44,7 @@ export const api = {
     if (user_email) fd.append('user_email', user_email);
     if (voice_note) fd.append('voice_note', voice_note);
 
-    return safeFetch(`${BASE_URL}/api/v1/report`, { method: 'POST', body: fd });
+    return safeFetch(`${BASE_URL}/api/v1/report`, { method: 'POST', body: fd }, REPORT_TIMEOUT_MS);
   },
 
   /** Dashboard totals + ward leaderboard. */

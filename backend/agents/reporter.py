@@ -93,14 +93,35 @@ class ReporterAgent(BaseAgent):
         )
 
         image_part = Part.from_bytes(data=photo_bytes, mime_type="image/jpeg")
-        raw = await _run_agent_once(
-            self._classifier,
-            [Part(text=prompt), image_part],
-            app_name="nammacity_reporter",
-        )
-
-        # Step 3: Parse and validate JSON output
-        result = self._parse_classification(raw)
+        try:
+            raw = await _run_agent_once(
+                self._classifier,
+                [Part(text=prompt), image_part],
+                app_name="nammacity_reporter",
+            )
+            result = self._parse_classification(raw)
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                # All models rate-limited — use a safe fallback so the rest of the
+                # pipeline (Geo, Routing, Drafting, Submission) can still complete.
+                logger.warning(
+                    "ReporterAgent: all models rate-limited, using fallback classification. error=%s",
+                    err_str[:120],
+                )
+                result = {
+                    "issue_type": "other",
+                    "severity": 3,
+                    "spam_score": 0.0,
+                    "description": "Civic issue reported via NammaCity (auto-classified — LLM quota exhausted)",
+                }
+            else:
+                logger.error("ReporterAgent: classification failed: %s", e)
+                return AgentOutput(
+                    agent_name=self.name,
+                    success=False,
+                    error=str(e),
+                )
 
         return AgentOutput(
             agent_name=self.name,

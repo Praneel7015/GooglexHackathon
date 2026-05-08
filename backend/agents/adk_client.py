@@ -1,9 +1,10 @@
 """
 ADK-native Gemini client for NammaCity.
 Replaces raw google-genai calls with Google ADK LlmAgent-backed inference.
-Exposes generate_text, generate_multimodal, and embed_text used by all agents.
+Implements automatic model fallback chain on 429 rate limits.
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -18,25 +19,24 @@ from config import settings
 
 logger = logging.getLogger("nammacity.adk_client")
 
-# Ensure ADK can find the API key.
-# Precedence:
-# 1. Existing GOOGLE_API_KEY in the environment
-# 2. settings.gemini_api_key
-# 3. settings.google_api_key
-_adk_google_api_key = (
-    settings.gemini_api_key
-    or getattr(settings, "google_api_key", None)
-)
-if _adk_google_api_key and not os.environ.get("GOOGLE_API_KEY"):
-    os.environ["GOOGLE_API_KEY"] = _adk_google_api_key
+# ── API key setup ─────────────────────────────────────────────────────────────
+_api_key = settings.gemini_api_key or settings.google_api_key
+if _api_key and not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = _api_key
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+# ── Model fallback chain ──────────────────────────────────────────────────────
+# gemini-2.5-flash: 20 req/day (free tier) — use as primary when quota allows
+# gemini-2.0-flash: 1500 req/day (free tier) — primary workhorse
+# gemini-2.0-flash-lite: 1500 req/day (free tier) — last resort
+MODEL_FALLBACK_CHAIN = [
+    "gemini-2.0-flash",        # primary — 1500/day free
+    "gemini-2.0-flash-lite",   # fallback — 1500/day free, lower quality
+    "gemini-2.5-flash",        # last resort — 20/day free, best quality
+]
+DEFAULT_MODEL = MODEL_FALLBACK_CHAIN[0]
 EMBED_MODEL = "text-embedding-004"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Shared singleton session service
-# ─────────────────────────────────────────────────────────────────────────────
-
+# ── Session service singleton ─────────────────────────────────────────────────
 _session_service = InMemorySessionService()
 _session_counter = 0
 
@@ -47,8 +47,23 @@ def _next_session_id() -> str:
     return f"nammacity-inference-{_session_counter}"
 
 
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Return True if the exception is a 429 quota error."""
+    msg = str(exc)
+    return "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower()
+
+
+def _parse_retry_delay(exc: Exception) -> float:
+    """Extract retryDelay seconds from ADK error message, default 5s."""
+    import re
+    match = re.search(r"retryDelay.*?(\d+(?:\.\d+)?)\s*s", str(exc))
+    if match:
+        return min(float(match.group(1)), 10.0)  # cap at 10s during demo
+    return 5.0
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Internal: run a single-turn ADK LlmAgent and return the text response
+# Core: run one LlmAgent turn with automatic model fallback on 429
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _run_agent_once(
@@ -57,40 +72,78 @@ async def _run_agent_once(
     app_name: str = "nammacity_inference",
 ) -> str:
     """
-    Run an LlmAgent for a single turn and return its text response.
-    Creates a fresh ephemeral session per call (stateless inference).
+    Run an LlmAgent for a single turn.
+    On 429, waits the retry delay then tries the next model in the fallback chain.
     """
-    runner = Runner(
-        agent=agent,
-        app_name=app_name,
-        session_service=_session_service,
-    )
+    # Build the fallback list: requested model first, then the rest of the chain
+    requested = agent.model or DEFAULT_MODEL
+    chain = [requested] + [m for m in MODEL_FALLBACK_CHAIN if m != requested]
 
-    session_id = _next_session_id()
-    session = await _session_service.create_session(
-        app_name=app_name,
-        user_id="nammacity_system",
-        session_id=session_id,
-    )
+    last_exc: Exception | None = None
 
-    message = Content(role="user", parts=message_parts)
-    response_text = ""
-
-    async for event in runner.run_async(
-        user_id="nammacity_system",
-        session_id=session.id,
-        new_message=message,
-    ):
-        if event.is_final_response() and event.content and event.content.parts:
-            response_text = "".join(
-                part.text for part in event.content.parts if getattr(part, "text", None)
+    for model in chain:
+        try:
+            # Rebuild agent with this model (LlmAgent is immutable after init)
+            current_agent = LlmAgent(
+                name=agent.name,
+                model=model,
+                instruction=agent.instruction or "",
+                tools=list(agent.tools) if agent.tools else [],
             )
+            runner = Runner(
+                agent=current_agent,
+                app_name=app_name,
+                session_service=_session_service,
+            )
+            session_id = _next_session_id()
+            session = await _session_service.create_session(
+                app_name=app_name,
+                user_id="nammacity_system",
+                session_id=session_id,
+            )
+            message = Content(role="user", parts=message_parts)
+            response_text = ""
 
-    return response_text
+            async for event in runner.run_async(
+                user_id="nammacity_system",
+                session_id=session.id,
+                new_message=message,
+            ):
+                if event.is_final_response() and event.content and event.content.parts:
+                    response_text = "".join(
+                        part.text
+                        for part in event.content.parts
+                        if getattr(part, "text", None)
+                    )
+
+            if model != requested:
+                logger.info("Model fallback succeeded: %s → %s", requested, model)
+            return response_text
+
+        except Exception as exc:
+            last_exc = exc
+            if _is_rate_limit_error(exc):
+                delay = _parse_retry_delay(exc)
+                if model != chain[-1]:
+                    next_model = chain[chain.index(model) + 1]
+                    logger.warning(
+                        "429 on %s (retryDelay=%.1fs) — falling back to %s",
+                        model, delay, next_model,
+                    )
+                    # Brief pause before trying next model
+                    await asyncio.sleep(min(delay, 2.0))
+                    continue
+                else:
+                    logger.error("All models rate-limited. Last error: %s", exc)
+                    raise
+            else:
+                raise  # Non-429 errors propagate immediately
+
+    raise last_exc or RuntimeError("All models in fallback chain failed")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Public API — drop-in replacements for gemini_client functions
+# Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def generate_text(
@@ -98,19 +151,18 @@ async def generate_text(
     model: str = DEFAULT_MODEL,
     system_instruction: str | None = None,
 ) -> str:
-    """
-    Generate text via an ADK LlmAgent.
-    Drop-in replacement for gemini_client.generate_text.
-    """
+    """Generate text via an ADK LlmAgent with automatic model fallback."""
     start = time.perf_counter()
     agent = LlmAgent(
         name="text_generator",
         model=model,
-        instruction=system_instruction or "You are a precise assistant. Follow instructions exactly. Return only what is asked for.",
+        instruction=system_instruction or (
+            "You are a precise assistant. Follow instructions exactly. "
+            "Return only what is asked for."
+        ),
     )
     result = await _run_agent_once(agent, [Part(text=prompt)])
-    latency = (time.perf_counter() - start) * 1000
-    logger.debug("generate_text model=%s latency_ms=%.1f", model, latency)
+    logger.debug("generate_text model=%s latency_ms=%.1f", model, (time.perf_counter() - start) * 1000)
     return result
 
 
@@ -120,21 +172,18 @@ async def generate_multimodal(
     model: str = DEFAULT_MODEL,
     system_instruction: str | None = None,
 ) -> str:
-    """
-    Generate text from a prompt + image via an ADK LlmAgent.
-    Drop-in replacement for gemini_client.generate_multimodal.
-    """
+    """Generate text from prompt + image with automatic model fallback."""
     start = time.perf_counter()
     agent = LlmAgent(
         name="multimodal_analyzer",
         model=model,
-        instruction=system_instruction or "You are a precise visual analyst. Return only valid JSON when asked for JSON.",
+        instruction=system_instruction or (
+            "You are a precise visual analyst. Return only valid JSON when asked for JSON."
+        ),
     )
-
     image_part = Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     result = await _run_agent_once(agent, [Part(text=prompt), image_part])
-    latency = (time.perf_counter() - start) * 1000
-    logger.debug("generate_multimodal model=%s latency_ms=%.1f", model, latency)
+    logger.debug("generate_multimodal model=%s latency_ms=%.1f", model, (time.perf_counter() - start) * 1000)
     return result
 
 
@@ -144,7 +193,7 @@ async def generate_multimodal_audio(
     mime_type: str = "audio/webm",
     model: str = DEFAULT_MODEL,
 ) -> str:
-    """Transcribe or reason over audio bytes via ADK LlmAgent."""
+    """Transcribe or reason over audio bytes via ADK LlmAgent with fallback."""
     start = time.perf_counter()
     agent = LlmAgent(
         name="audio_transcriber",
@@ -153,8 +202,7 @@ async def generate_multimodal_audio(
     )
     audio_part = Part.from_bytes(data=audio_bytes, mime_type=mime_type)
     result = await _run_agent_once(agent, [Part(text=prompt), audio_part])
-    latency = (time.perf_counter() - start) * 1000
-    logger.debug("generate_multimodal_audio model=%s latency_ms=%.1f", model, latency)
+    logger.debug("generate_multimodal_audio model=%s latency_ms=%.1f", model, (time.perf_counter() - start) * 1000)
     return result
 
 
@@ -163,20 +211,19 @@ async def embed_text(
     model: str = EMBED_MODEL,
 ) -> list[float]:
     """
-    Embed text using the google-genai client directly (ADK does not wrap embeddings).
-    Falls back to google.genai for embedding-specific models.
+    Embed text using google-genai directly (ADK does not wrap embedding models).
+    Embedding models have separate higher quotas.
     """
     from google import genai as _genai
     start = time.perf_counter()
-    client = _genai.Client(api_key=settings.gemini_api_key)
+    client = _genai.Client(api_key=_api_key or settings.gemini_api_key)
     response = client.models.embed_content(model=model, contents=text)
-    latency = (time.perf_counter() - start) * 1000
-    logger.debug("embed_text model=%s latency_ms=%.1f", model, latency)
+    logger.debug("embed_text model=%s latency_ms=%.1f", model, (time.perf_counter() - start) * 1000)
     return response.embeddings[0].values
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Factory: build a named ADK LlmAgent for use inside a NammaCity agent class
+# Factory: build a named ADK LlmAgent for injection into NammaCity agents
 # ─────────────────────────────────────────────────────────────────────────────
 
 def make_agent(
@@ -185,10 +232,7 @@ def make_agent(
     model: str = DEFAULT_MODEL,
     tools: list[FunctionTool] | None = None,
 ) -> LlmAgent:
-    """
-    Build a named ADK LlmAgent for a NammaCity sub-agent.
-    Pass tools=[] explicitly if you want a tool-calling agent.
-    """
+    """Build a named ADK LlmAgent. model defaults to the primary in the fallback chain."""
     return LlmAgent(
         name=name,
         model=model,

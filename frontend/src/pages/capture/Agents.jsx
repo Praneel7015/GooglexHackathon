@@ -9,10 +9,25 @@ import { findNearby } from '../../lib/seed';
 import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 
+// Labels shown while waiting on the Drafting + Submission stage (slow due to LLM calls)
+const WAITING_HINTS = [
+  'Drafting formal complaint letter…',
+  'Translating to Kannada…',
+  'Composing tweet…',
+  'Generating RTI template…',
+  'Dispatching to agencies…',
+];
+
+// Module-level flag so React StrictMode's double-mount doesn't fire the
+// pipeline twice. A ref would reset between mounts; a module variable persists.
+let _pipelineStarted = false;
+
 export default function Agents() {
   const T = useT();
   const [activeIndex, setActiveIndex] = useState(0);
   const [outputs, setOutputs] = useState({});
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [waitingHint, setWaitingHint] = useState('');
   const navigate = useNavigate();
   const cur = useApp(s => s.current);
   const patch = useApp(s => s.patchCurrent);
@@ -21,14 +36,38 @@ export default function Agents() {
   const patchRef = useRef(patch);
   const navigateRef = useRef(navigate);
 
-  const submittedRef = useRef(false);
+  // Reset the module-level guard when the component unmounts for real
+  // (i.e. the user navigates away or submits again later).
+  useEffect(() => {
+    return () => { _pipelineStarted = false; };
+  }, []);
+
+  // Elapsed timer — shown while the backend is processing
+  useEffect(() => {
+    const start = Date.now();
+    const t = setInterval(() => setElapsedSec(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Cycle through waiting hints while drafting/submitting (slow LLM stages)
+  useEffect(() => {
+    let i = 0;
+    const t = setInterval(() => {
+      i = (i + 1) % WAITING_HINTS.length;
+      setWaitingHint(WAITING_HINTS[i]);
+    }, 3000);
+    setWaitingHint(WAITING_HINTS[0]);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
-    // Guard against React StrictMode double-mount
-    if (submittedRef.current) return;
-    submittedRef.current = true;
+    // Guard: module-level variable persists across StrictMode double-mount.
+    // Reset when navigating away so submitting again on a fresh page works.
+    if (_pipelineStarted) return;
+    _pipelineStarted = true;
 
     const snapshot = curRef.current;
+    // `cancelled` only prevents duplicate API calls — it never blocks navigation.
     let cancelled = false;
 
     // Convert dataURL photo to a File for the backend
@@ -42,24 +81,25 @@ export default function Agents() {
     async function runReal() {
       const photoFile = await dataURLtoFile(snapshot.photo);
       if (!photoFile) {
-        // Fallback to mock pipeline if no photo
         runMock();
         return;
       }
 
-      // Start the mock animation in parallel so UI feels responsive
+      // Start the animation in parallel so UI feels responsive.
+      // Advances through stages until the last one, then pulses "working" hints.
       const animStages = [...AGENT_STAGES];
       let animIdx = 0;
       const animTimer = setInterval(() => {
-        if (cancelled || animIdx >= animStages.length) {
-          clearInterval(animTimer);
-          return;
+        if (cancelled) { clearInterval(animTimer); return; }
+        if (animIdx < animStages.length - 1) {
+          const stage = animStages[animIdx];
+          setActiveIndex(animIdx + 1);
+          setOutputs(o => ({ ...o, [stage.key]: '...' }));
+          animIdx++;
         }
-        const stage = animStages[animIdx];
-        setActiveIndex(animIdx + 1);
-        setOutputs(o => ({ ...o, [stage.key]: '...' }));
-        animIdx++;
-      }, 1800);
+        // Once at the last stage, the timer keeps running so the pulse animation
+        // stays active — just don't advance past the end.
+      }, 2500);
 
       // Get user info from store for user-attribution
       const state = useApp.getState();
@@ -78,10 +118,12 @@ export default function Agents() {
 
       clearInterval(animTimer);
 
-      if (cancelled) return;
+      // NOTE: Do NOT check `cancelled` here — we always want to update the UI
+      // and navigate after the backend responds, even if StrictMode unmounted
+      // and remounted the component. The module-level guard ensures only one
+      // API call fires, so we always act on its result.
 
       if (result) {
-        // Drive UI with real data
         const r = result.reporter || {};
         const g = result.geo || {};
         const rt = result.routing || {};
@@ -110,7 +152,6 @@ export default function Agents() {
         });
         setActiveIndex(AGENT_STAGES.length);
 
-        // Update store with real data
         patchRef.current({
           issue: r.issue_type || snapshot.issue,
           severity: r.severity || snapshot.severity,
@@ -121,12 +162,8 @@ export default function Agents() {
           nearby: cv.nearest_complaints || [],
           backendResult: result,
         });
-
-        setTimeout(() => {
-          if (!cancelled) navigateRef.current('/confirm');
-        }, 1200);
       } else {
-        // Backend failed — save locally, don't fake success
+        // Backend failed — save locally
         console.warn('[Agents] Backend unavailable, complaint saved locally only');
         setOutputs({
           reporter: 'Offline — saved locally',
@@ -138,10 +175,9 @@ export default function Agents() {
         });
         setActiveIndex(AGENT_STAGES.length);
         patchRef.current({ backendResult: null });
-        setTimeout(() => {
-          if (!cancelled) navigateRef.current('/confirm');
-        }, 1500);
       }
+
+      setTimeout(() => navigateRef.current('/confirm'), 1200);
     }
 
     function runMock() {
@@ -173,9 +209,21 @@ export default function Agents() {
           <AgentPipeline activeIndex={activeIndex} outputs={outputs} />
         </div>
         <div className="text-right font-hand text-olive text-[13px] -rotate-2 -mt-2">{T('ag.live')}</div>
-        <div className="font-mono text-center text-[10px] text-coffee/55 mt-1">
-          {activeIndex >= AGENT_STAGES.length ? T('ag.done') : T('ag.progress', { done: activeIndex, total: AGENT_STAGES.length })}
-        </div>
+        {activeIndex >= AGENT_STAGES.length ? (
+          <div className="font-mono text-center text-[10px] text-coffee/55 mt-1">
+            {T('ag.done')}
+          </div>
+        ) : (
+          <div className="mt-1 space-y-0.5">
+            <div className="font-mono text-center text-[10px] text-coffee/55 animate-pulse">
+              {waitingHint}
+            </div>
+            <div className="font-mono text-center text-[9px] text-coffee/40">
+              {T('ag.progress', { done: activeIndex, total: AGENT_STAGES.length })}
+              {elapsedSec > 5 ? ` · ${elapsedSec}s` : ''}
+            </div>
+          </div>
+        )}
       </div>
     </PhoneFrame>
   );
