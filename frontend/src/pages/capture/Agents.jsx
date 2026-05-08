@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PhoneFrame } from '../../components/ui';
 import StepHeader from '../../components/StepHeader';
@@ -16,21 +16,28 @@ export default function Agents() {
   const cur = useApp(s => s.current);
   const patch = useApp(s => s.patchCurrent);
 
+  // Capture latest values in refs so the pipeline effect only runs once on mount
+  const curRef = useRef(cur);
+  const patchRef = useRef(patch);
+  const navigateRef = useRef(navigate);
+
   useEffect(() => {
-    const cancel = runPipeline(cur, {
+    const snapshot = curRef.current;
+    const cancel = runPipeline(snapshot, {
       onStage: (i, stage, output) => {
         setActiveIndex(i + 1);
         setOutputs(o => ({ ...o, [stage.key]: output }));
         if (stage.key === 'crowd') {
-          const nearby = findNearby({ ll: cur.gps || [13.0995, 77.5963], issue: cur.issue, id: 'NEW' });
-          patch({ nearby, bundleSize: nearby.length });
+          const nearby = findNearby({ ll: snapshot.gps || [13.0995, 77.5963], issue: snapshot.issue, id: 'NEW' });
+          patchRef.current({ nearby, bundleSize: nearby.length });
         }
       },
-      onDone: () => setTimeout(() => navigate('/confirm'), 600),
+      onDone: () => setTimeout(() => navigateRef.current('/confirm'), 600),
       perStageMs: 900
     });
     return cancel;
-  }, [cur, navigate, patch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <PhoneFrame>
