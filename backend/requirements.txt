@@ -1,6 +1,7 @@
 fastapi[standard]
 uvicorn[standard]
 google-generativeai
+google-genai
 google-adk
 supabase
 qdrant-client
@@ -9,5 +10,7 @@ python-dotenv
 pydantic-settings
 pillow
 tweepy
+tenacity
 pytest
 pytest-asyncio
+httpx

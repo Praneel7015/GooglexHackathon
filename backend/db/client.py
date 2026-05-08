@@ -1,5 +1,6 @@
 """
-Async Supabase client and helper functions for NammaCity DB operations.
+Async Supabase client and repository helpers for NammaCity DB operations.
+Covers complaints, clusters, submissions, escalations, agencies, and ward officers.
 """
 
 from supabase import create_client, Client
@@ -107,3 +108,133 @@ async def get_ward_officer(ward_number: int) -> dict | None:
         .execute()
     )
     return result.data[0] if result.data else None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Complaint queries (dashboard + detail)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_complaint_by_id(complaint_id: str) -> dict | None:
+    """Fetch a single complaint by UUID."""
+    client = get_client()
+    result = (
+        client.table("complaints")
+        .select("*")
+        .eq("id", complaint_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+async def get_all_complaints(
+    status: str | None = None,
+    ward_number: int | None = None,
+    issue_type: str | None = None,
+    limit: int = 500,
+) -> list[dict]:
+    """
+    Fetch complaints with optional filters.
+    Returns up to `limit` rows ordered newest-first.
+    """
+    client = get_client()
+    query = client.table("complaints").select("*").order("created_at", desc=True).limit(limit)
+    if status:
+        query = query.eq("status", status)
+    if ward_number is not None:
+        query = query.eq("ward_number", ward_number)
+    if issue_type:
+        query = query.eq("issue_type", issue_type)
+    result = query.execute()
+    return result.data or []
+
+
+async def get_map_complaints() -> list[dict]:
+    """
+    Fetch all geo-located complaints for the dashboard map via PostGIS RPC.
+    Returns id, issue_type, severity, status, ward_number, lat, lng, cluster_id.
+    """
+    client = get_client()
+    try:
+        result = client.rpc("get_open_complaints_map", {}).execute()
+        return result.data or []
+    except Exception:
+        # Fallback: fetch without geometry extraction if RPC not yet deployed
+        result = client.table("complaints").select(
+            "id,issue_type,severity,status,ward_number,zone,cluster_id,created_at"
+        ).limit(500).execute()
+        return result.data or []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard aggregate stats
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_dashboard_stats() -> dict:
+    """
+    Compute aggregate stats for the public dashboard.
+    Returns totals, status breakdown, and top issue types.
+    """
+    client = get_client()
+    try:
+        all_rows = client.table("complaints").select("status,issue_type,ward_number,severity").limit(5000).execute()
+        rows = all_rows.data or []
+    except Exception:
+        rows = []
+
+    total = len(rows)
+    open_count = sum(1 for r in rows if r.get("status") == "open")
+    in_progress = sum(1 for r in rows if r.get("status") == "in_progress")
+    resolved = sum(1 for r in rows if r.get("status") == "resolved")
+
+    from collections import Counter
+    issue_counter = Counter(r.get("issue_type") for r in rows if r.get("issue_type"))
+    top_issues = [{"issue_type": k, "count": v} for k, v in issue_counter.most_common(5)]
+
+    ward_counter = Counter(r.get("ward_number") for r in rows if r.get("ward_number") is not None)
+    hotspot_wards = [{"ward_number": k, "count": v} for k, v in ward_counter.most_common(5)]
+
+    return {
+        "total_complaints": total,
+        "open": open_count,
+        "in_progress": in_progress,
+        "resolved": resolved,
+        "resolution_rate": round(resolved / total, 3) if total else 0.0,
+        "top_issue_types": top_issues,
+        "hotspot_wards": hotspot_wards,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cluster queries
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_active_clusters() -> list[dict]:
+    """Fetch all active crowd-validation clusters."""
+    client = get_client()
+    result = (
+        client.table("clusters")
+        .select("*")
+        .eq("status", "active")
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+    return result.data or []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Escalation queries
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_escalations_for_complaint(complaint_id: str) -> list[dict]:
+    """Fetch the full escalation timeline for a complaint, ordered by day."""
+    client = get_client()
+    result = (
+        client.table("escalations")
+        .select("day,action,status,draft_text,scheduled_for,executed_at")
+        .eq("complaint_id", complaint_id)
+        .order("day")
+        .execute()
+    )
+    return result.data or []
