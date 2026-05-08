@@ -219,7 +219,7 @@ def seed_complaints_supabase(client, complaints: list[dict]) -> int:
 async def seed_complaints_qdrant(complaints: list[dict]) -> int:
     """Embed each complaint description and upsert into Qdrant."""
     # Import here to keep script runnable even if qdrant/gemini are offline
-    from agents.gemini_client import embed_text
+    from agents.adk_client import embed_text
     from integrations.qdrant_client import ensure_collection, upsert_complaint
 
     ensure_collection()
