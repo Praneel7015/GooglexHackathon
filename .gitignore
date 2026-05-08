@@ -44,3 +44,10 @@ frontend/build/
 # Logs
 *.log
 npm-debug.log*
+
+
+orchestration reports/
+backend/.env
+
+.env
+.cursor/
