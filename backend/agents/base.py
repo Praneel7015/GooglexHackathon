@@ -15,6 +15,14 @@ from pydantic import BaseModel
 logger = logging.getLogger("nammacity.agents")
 
 
+def _safe_for_json(data: dict[str, Any]) -> dict[str, Any]:
+    """Strip non-serializable values (bytes) from a dict for logging."""
+    return {
+        k: f"<{len(v)} bytes>" if isinstance(v, (bytes, bytearray)) else v
+        for k, v in data.items()
+    }
+
+
 class AgentInput(BaseModel):
     """Standard input passed between agents in a pipeline."""
     data: dict[str, Any] = {}
@@ -49,7 +57,7 @@ class BaseAgent(ABC):
         logger.info(json.dumps({
             "event": "agent_start",
             "agent": self.name,
-            "input": agent_input.data,
+            "input": _safe_for_json(agent_input.data),
         }))
 
         try:
