@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PhoneFrame, Card, Button } from '../../components/ui';
 import { useApp } from '../../lib/store';
 import { runSubmission } from '../../lib/agents';
+import { useT } from '../../lib/i18n';
 
 const CHANNELS = [
   { key: 'twitter',  label: 'Twitter',     hint: '@BBMPCOMM' },
@@ -12,6 +13,7 @@ const CHANNELS = [
 ];
 
 export default function Confirm() {
+  const T = useT();
   const cur = useApp(s => s.current);
   const patchChannel = useApp(s => s.patchChannel);
   const fileCurrent = useApp(s => s.fileCurrent);
@@ -21,8 +23,7 @@ export default function Confirm() {
   useEffect(() => {
     const cancel = runSubmission(cur, (k) => patchChannel(k, true));
     return cancel;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cur, patchChannel]);
 
   const goTrack = () => {
     const filed = fileCurrent();
@@ -34,11 +35,9 @@ export default function Confirm() {
       <div className="flex flex-col h-full p-4">
         <div className="text-center mt-1">
           <div className="w-12 h-12 rounded-full bg-olive border-[1.5px] border-line mx-auto mb-2.5 flex items-center justify-center text-mist text-2xl animate-pop-in">✓</div>
-          <h1 className="font-hand text-coffee text-[24px] leading-tight">Filed on behalf of you<br/>and {bundleN} neighbours.</h1>
-          <div className="font-kn text-coffee/65 text-[11px] mt-1">ನೀವು ಮತ್ತು {bundleN} ನೆರೆಹೊರೆಯವರ ಪರವಾಗಿ</div>
+          <h1 className="font-hand text-coffee text-[24px] leading-tight whitespace-pre-line">{T('conf.filed', { n: bundleN })}</h1>
         </div>
 
-        {/* mini map cluster */}
         <Card padding="p-0" tone="mist" className="mt-3 h-24 overflow-hidden relative">
           <svg viewBox="0 0 220 96" width="100%" height="100%" className="block">
             <path d="M10 80 Q 30 30, 70 25 Q 130 15, 180 35 Q 210 55, 200 85 Q 100 92, 10 80 z"
@@ -53,7 +52,7 @@ export default function Confirm() {
           </svg>
         </Card>
 
-        <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mt-3 mb-1.5">Channels confirmed</div>
+        <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mt-3 mb-1.5">{T('conf.channels')}</div>
         <div className="space-y-1.5">
           {CHANNELS.map(c => {
             const sent = !!cur.channels[c.key];
@@ -68,7 +67,7 @@ export default function Confirm() {
           })}
         </div>
 
-        <Button variant="primary" onClick={goTrack} full size="md" className="mt-auto">Track this complaint →</Button>
+        <Button variant="primary" onClick={goTrack} full size="md" className="mt-auto">{T('conf.track')}</Button>
       </div>
     </PhoneFrame>
   );

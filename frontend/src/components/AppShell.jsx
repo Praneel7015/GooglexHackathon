@@ -1,12 +1,12 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { Logo, LanguageToggle } from './ui';
+import { Logo } from './ui';
+import { useT } from '../lib/i18n';
 
-// AppShell is the *in-app* shell with bottom nav. Used after onboarding.
 const TABS = [
-  { to: '/capture',     label: 'File',      icon: 'camera' },
-  { to: '/track',       label: 'Track',     icon: 'list' },
-  { to: '/dashboard',   label: 'Dashboard', icon: 'map' },
-  { to: '/settings',    label: 'Settings',  icon: 'gear' }
+  { to: '/capture',   labelKey: 'nav.file',      icon: 'camera' },
+  { to: '/track',     labelKey: 'nav.track',     icon: 'list' },
+  { to: '/dashboard', labelKey: 'nav.dashboard', icon: 'map' },
+  { to: '/settings',  labelKey: 'nav.settings',  icon: 'gear' }
 ];
 
 const ICONS = {
@@ -25,31 +25,28 @@ function Icon({ name, active }) {
 }
 
 export default function AppShell() {
+  const T = useT();
   return (
     <div className="min-h-[100dvh] bg-paper text-coffee flex flex-col">
-      {/* top bar (mobile only) */}
       <header className="md:hidden flex items-center px-4 pt-safe pb-2 border-b border-line/20">
         <Link to="/"><Logo size={26} withText /></Link>
       </header>
 
-      {/* desktop sidebar + content */}
       <div className="flex-1 flex md:flex-row flex-col">
         <aside className="hidden md:flex md:flex-col w-56 bg-coffee text-mist border-r border-line p-5 gap-2">
           <Link to="/" className="mb-4"><Logo size={32} dark /></Link>
           {TABS.map(t => (
             <NavLink key={t.to} to={t.to} className={({ isActive }) =>
-              [
-                'rounded-md px-3 py-2 font-sans text-sm flex items-center gap-2 transition-colors',
+              ['rounded-md px-3 py-2 font-sans text-sm flex items-center gap-2 transition-colors',
                 isActive ? 'bg-mist text-coffee font-semibold' : 'text-mist/85 hover:bg-mist/10'
               ].join(' ')
             }>
               <Icon name={t.icon} active={false} />
-              <span>{t.label}</span>
+              <span>{T(t.labelKey)}</span>
             </NavLink>
           ))}
           <div className="mt-auto pt-4 border-t border-mist/15">
-            <LanguageToggle tone="dark" />
-            <div className="text-[10px] mt-3 opacity-50 font-mono">v0.1.0 · open civic project</div>
+            <div className="text-[10px] opacity-50 font-mono">v0.1.0 · open civic project</div>
           </div>
         </aside>
 
@@ -58,7 +55,6 @@ export default function AppShell() {
         </main>
       </div>
 
-      {/* bottom nav (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-paper border-t border-line/40 pb-safe">
         <div className="flex">
           {TABS.map(t => (
@@ -68,7 +64,7 @@ export default function AppShell() {
               {({ isActive }) => (
                 <>
                   <Icon name={t.icon} active={isActive} />
-                  <span className="text-[10px] font-sans font-medium">{t.label}</span>
+                  <span className="text-[10px] font-sans font-medium">{T(t.labelKey)}</span>
                   <span className={`h-0.5 w-5 rounded-full ${isActive ? 'bg-olive' : 'bg-transparent'}`} />
                 </>
               )}

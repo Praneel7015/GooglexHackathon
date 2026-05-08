@@ -1,5 +1,6 @@
 import { Card, Chip, Toggle, LanguageToggle } from '../components/ui';
 import { useApp } from '../lib/store';
+import { useT } from '../lib/i18n';
 
 const CHANNEL_DEFS = [
   { key: 'email',    label: 'Email',                 sym: '@' },
@@ -16,11 +17,12 @@ const PREFS = [
 ];
 
 export default function Settings() {
+  const T = useT();
   const { user, channels, setChannel, preferences, togglePreference } = useApp();
   return (
     <div className="max-w-md mx-auto p-4 md:p-6">
-      <h1 className="font-hand text-coffee text-2xl font-bold tracking-tight">Settings</h1>
-      <div className="font-kn text-coffee/65 text-[11px] mb-4">ಸೆಟ್ಟಿಂಗ್‌ಗಳು</div>
+      <h1 className="font-hand text-coffee text-2xl font-bold tracking-tight">{T('settings.heading')}</h1>
+      <div className="font-kn text-coffee/65 text-[11px] mb-4">{T('settings.subtitle')}</div>
 
       {/* profile */}
       <Card tone="mist" padding="p-3" className="flex gap-2.5 items-center mb-5">
@@ -36,7 +38,7 @@ export default function Settings() {
       </Card>
 
       {/* channels */}
-      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">Channels we'll file from</div>
+      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">{T('settings.channels')}</div>
       <Card padding="p-0" className="mb-5">
         {CHANNEL_DEFS.map((c, i) => {
           const conn = channels[c.key];
@@ -61,7 +63,7 @@ export default function Settings() {
       </Card>
 
       {/* preferences */}
-      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">Filing preferences</div>
+      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">{T('settings.prefs')}</div>
       <Card padding="p-0" className="mb-5">
         {PREFS.map((p, i) => (
           <div key={p.key} className={'flex items-center gap-2.5 px-3 py-2.5 ' + (i < PREFS.length - 1 ? 'border-b border-dotted border-beige' : '')}>
@@ -75,11 +77,11 @@ export default function Settings() {
       </Card>
 
       {/* language */}
-      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">Language</div>
+      <div className="text-[10px] uppercase tracking-wider font-sans text-coffee/55 mb-1.5">{T('settings.language')}</div>
       <div className="mb-5"><LanguageToggle /></div>
 
-      <div className="font-sans text-[10px] text-coffee/55 text-center mb-1.5">v1.0.0 · Made for Bengaluru · open source</div>
-      <button className="block w-full font-sans text-[12px] text-olive font-semibold underline">Sign out</button>
+      <div className="font-sans text-[10px] text-coffee/55 text-center mb-1.5">{T('settings.version')}</div>
+      <button className="block w-full font-sans text-[12px] text-olive font-semibold underline">{T('settings.signout')}</button>
     </div>
   );
 }

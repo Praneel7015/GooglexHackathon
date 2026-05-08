@@ -3,8 +3,7 @@ import { useApp } from '../../lib/store';
 const LANGS = [
   { code: 'KN', label: 'ಕನ್ನಡ' },
   { code: 'EN', label: 'EN' },
-  { code: 'HI', label: 'हिं' },
-  { code: 'TA', label: 'த' }
+  { code: 'HI', label: 'हिं' }
 ];
 
 export default function LanguageToggle({ tone = 'light', compact = false }) {

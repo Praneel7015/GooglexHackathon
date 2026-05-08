@@ -3,8 +3,10 @@ import { Card, Chip, LanguageToggle, Logo } from '../components/ui';
 import { aggregateStats, COMPLAINTS, WARDS } from '../lib/seed';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useT } from '../lib/i18n';
 
 export default function Dashboard() {
+  const T = useT();
   const stats = aggregateStats();
   const [filter, setFilter] = useState('All');
   const recent = [...COMPLAINTS].sort((a, b) => a.ageDays - b.ageDays).slice(0, 8);
@@ -14,10 +16,9 @@ export default function Dashboard() {
       {/* masthead */}
       <div className="bg-coffee text-mist border-b border-line">
         <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-3 md:py-4 flex flex-wrap items-center gap-3 md:gap-5">
-          <Logo size={26} dark />
           <div className="flex-1 min-w-[140px]">
-            <div className="font-sans text-[9px] uppercase tracking-[.18em] opacity-70">Bengaluru's Civic Pulse · Live</div>
-            <div className="font-kn text-[11px] opacity-75 mt-0.5">ಬೆಂಗಳೂರಿನ ನಾಗರಿಕ ನಾಡಿಮಿಡಿತ</div>
+            <div className="font-sans text-[9px] uppercase tracking-[.18em] opacity-70">{T('dash.live')}</div>
+            <div className="font-kn text-[11px] opacity-75 mt-0.5">{T('dash.subtitle')}</div>
           </div>
           <div className="font-mono text-[10px] opacity-70 hidden md:block">{new Date().toUTCString().slice(5, 22)} IST</div>
           <LanguageToggle tone="dark" />
@@ -27,10 +28,10 @@ export default function Dashboard() {
       {/* stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-b border-line">
         {[
-          [stats.open.toLocaleString(),     'open complaints',       'beige'],
-          [`${stats.resolvedPct}%`,         'resolved < 30 days',    'olive'],
-          [String(stats.wardsReporting),    'wards reporting',       'paper'],
-          [`${stats.medianFirstResponse} days`, 'median first response', 'paper']
+          [stats.open.toLocaleString(),         T('stat.open'),      'beige'],
+          [`${stats.resolvedPct}%`,              T('stat.resolved') + ' < 30 days', 'olive'],
+          [String(stats.wardsReporting),         T('stat.wards') + ' reporting',    'paper'],
+          [`${stats.medianFirstResponse} days`,  'median first response',            'paper']
         ].map(([n, l, tone], i) => (
           <div key={i} className={[
             'p-4 md:p-5 border-r border-line last:border-r-0',
@@ -50,19 +51,19 @@ export default function Dashboard() {
         <div className="relative h-[60vh] lg:h-[calc(100vh-200px)] border-b lg:border-b-0 lg:border-r border-line">
           <BangaloreMap mode="clusters" interactive />
           <div className="absolute bottom-3 left-3 z-[400] bg-paper border border-line rounded p-2 text-[10px]">
-            <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mb-1">Complaint density</div>
+            <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mb-1">{T('dash.density')}</div>
             <div className="flex items-center gap-2">
               <div className="w-20 h-2 border border-line" style={{ background: 'linear-gradient(to right, #f1e0c5, #71816d, #342a21)' }} />
-              <span className="font-mono text-[9px]">low</span>
-              <span className="font-mono text-[9px] ml-auto">high</span>
+              <span className="font-mono text-[9px]">{T('dash.low')}</span>
+              <span className="font-mono text-[9px] ml-auto">{T('dash.high')}</span>
             </div>
           </div>
         </div>
 
         {/* leaderboard rail */}
         <aside className="bg-paper p-4 md:p-6 lg:overflow-y-auto lg:max-h-[calc(100vh-200px)]">
-          <Chip>Trending issues</Chip>
-          <h3 className="font-hand text-coffee text-2xl mt-1.5 mb-3 leading-tight">Right now in your city</h3>
+          <Chip>{T('dash.trending')}</Chip>
+          <h3 className="font-hand text-coffee text-2xl mt-1.5 mb-3 leading-tight">{T('dash.rightnow')}</h3>
           <ul className="text-[12px] font-sans space-y-1.5 mb-5">
             {[
               ['Garbage pickup missed · Whitefield', 18],
@@ -77,7 +78,7 @@ export default function Dashboard() {
             ))}
           </ul>
 
-          <Chip>Ward leaderboard</Chip>
+          <Chip>{T('dash.leaderboard')}</Chip>
           <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
             {['All', 'Pothole', 'Garbage', 'Water'].map(f => (
               <Chip
@@ -113,7 +114,7 @@ export default function Dashboard() {
 
           <div className="font-hand text-[12px] text-coffee/65 mt-3 text-right">↓ click any row → officer scorecard</div>
 
-          <Chip className="mt-6">Latest filed</Chip>
+          <Chip className="mt-6">{T('dash.latest')}</Chip>
           <ul className="mt-2 space-y-1.5">
             {recent.map(c => (
               <li key={c.id} className="grid grid-cols-[80px_1fr_64px] text-[11px] font-sans gap-2 items-center border-b border-dashed border-beige pb-1">

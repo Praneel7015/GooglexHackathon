@@ -1,35 +1,32 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Logo, LanguageToggle, Button } from './ui';
 import { useState } from 'react';
+import { useT } from '../lib/i18n';
 
 const NAV = [
-  { to: '/dashboard',   label: 'Dashboard' },
-  { to: '/leaderboard', label: 'Wards' },
-  { to: '/install',     label: 'Install' }
+  { to: '/dashboard', labelKey: 'nav.dashboard' },
+  { to: '/leaderboard', labelKey: 'nav.wards' }
 ];
 
 export default function PublicShell({ floatingHeader = false }) {
   const [open, setOpen] = useState(false);
+  const T = useT();
   const loc = useLocation();
-  const onLanding = loc.pathname === '/';
   return (
     <div className="min-h-[100dvh] bg-paper text-coffee flex flex-col">
-      <header className={[
-        'sticky top-0 z-30 border-b border-line bg-paper/95 backdrop-blur',
-        floatingHeader ? '' : ''
-      ].join(' ')}>
+      <header className={['sticky top-0 z-30 border-b border-line bg-paper/95 backdrop-blur', floatingHeader ? '' : ''].join(' ')}>
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-3 flex items-center gap-4 md:gap-8">
           <Link to="/" className="shrink-0"><Logo size={28} /></Link>
           <nav className="hidden md:flex gap-5 font-sans text-[13px] text-coffee/80">
             {NAV.map(n => (
               <NavLink key={n.to} to={n.to} className={({ isActive }) =>
                 isActive ? 'text-coffee font-semibold ul-strk' : 'hover:text-coffee'
-              }>{n.label}</NavLink>
+              }>{T(n.labelKey)}</NavLink>
             ))}
           </nav>
           <div className="flex-1" />
           <LanguageToggle />
-          <Button as={Link} to="/onboard" variant="primary" size="sm" className="hidden md:inline-flex">Open app</Button>
+          <Button as={Link} to="/install" variant="primary" size="sm" className="hidden md:inline-flex">{T('nav.openapp')}</Button>
           <button
             onClick={() => setOpen(o => !o)}
             className="md:hidden p-2 rounded-md border border-line bg-paper"
@@ -44,9 +41,9 @@ export default function PublicShell({ floatingHeader = false }) {
           <div className="md:hidden border-t border-line/30 bg-paper">
             <div className="px-4 py-3 flex flex-col gap-2 font-sans text-sm">
               {NAV.map(n => (
-                <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="py-1.5">{n.label}</Link>
+                <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="py-1.5">{T(n.labelKey)}</Link>
               ))}
-              <Button as={Link} to="/onboard" variant="primary" size="md" full onClick={() => setOpen(false)}>Open app</Button>
+              <Button as={Link} to="/install" variant="primary" size="md" full onClick={() => setOpen(false)}>{T('nav.openapp')}</Button>
             </div>
           </div>
         )}

@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react';
 import { Chip } from '../components/ui';
 import { Link } from 'react-router-dom';
 import { WARDS } from '../lib/seed';
+import { useT } from '../lib/i18n';
 
 export default function Leaderboard() {
+  const T = useT();
   const [filter, setFilter] = useState('All');
   const [sortDir, setSortDir] = useState('desc');
   const ranked = useMemo(() =>
@@ -12,25 +14,30 @@ export default function Leaderboard() {
   );
   return (
     <section className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 md:py-12">
-      <Chip>198 wards · ranked by resolution rate</Chip>
+      <Chip>{T('lb.chip')}</Chip>
       <h1 className="font-hand text-coffee text-4xl md:text-5xl mt-1 leading-[.95] tracking-tight">
-        How is your ward<br/>actually performing?
+        {T('lb.heading')}
       </h1>
-      <p className="font-kn text-coffee/70 mt-2">ನಿಮ್ಮ ವಾರ್ಡ್ ಹೇಗೆ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ?</p>
+      <p className="font-kn text-coffee/70 mt-2">{T('lb.subtitle')}</p>
 
       <div className="flex flex-wrap gap-2 items-center mt-6">
         {['All', 'Pothole', 'Garbage', 'Water', 'Streetlight'].map(f => (
           <Chip key={f} tone={filter === f ? 'coffee' : 'paper'} onClick={() => setFilter(f)} className="cursor-pointer">{f}</Chip>
         ))}
         <span className="ml-auto font-mono text-[11px] text-coffee/65 cursor-pointer" onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}>
-          SORT · resolution rate {sortDir === 'desc' ? '↓' : '↑'}
+          {T('lb.sort')} {sortDir === 'desc' ? '↓' : '↑'}
         </span>
       </div>
 
       {/* table */}
       <div className="border-[1.5px] border-line rounded-md overflow-hidden mt-3 bg-paper">
         <div className="grid grid-cols-[40px_1fr_1.1fr_70px_1.2fr_70px] bg-beige px-4 py-2 border-b border-line font-sans text-[10px] uppercase tracking-wider font-semibold">
-          <div>#</div><div>Ward</div><div className="hidden md:block">Councillor</div><div className="text-right">Open</div><div>Resolution</div><div className="text-right">Avg time</div>
+          <div>#</div>
+          <div>{T('lb.col.ward')}</div>
+          <div className="hidden md:block">{T('lb.col.councillor')}</div>
+          <div className="text-right">{T('lb.col.open')}</div>
+          <div>{T('lb.col.resolution')}</div>
+          <div className="text-right">{T('lb.col.avgtime')}</div>
         </div>
         {ranked.map((w, i) => (
           <Link
@@ -58,7 +65,7 @@ export default function Leaderboard() {
         ))}
       </div>
 
-      <div className="font-hand text-[13px] text-coffee/70 mt-3 text-right">↓ click any row → officer scorecard</div>
+      <div className="font-hand text-[13px] text-coffee/70 mt-3 text-right">{T('lb.footer')}</div>
     </section>
   );
 }

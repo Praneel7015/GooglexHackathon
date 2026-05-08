@@ -1,42 +1,49 @@
 import { Link } from 'react-router-dom';
 import { Button, Card, Chip } from '../components/ui';
-import { useApp } from '../lib/store';
 import { aggregateStats } from '../lib/seed';
-import { t } from '../lib/i18n';
+import { useT } from '../lib/i18n';
 
 export default function Landing() {
-  const lang = useApp(s => s.language);
+  const T = useT();
   const stats = aggregateStats();
+
+  const HOW = [
+    ['01', T('how.01.title'), T('how.01.body')],
+    ['02', T('how.02.title'), T('how.02.body')],
+    ['03', T('how.03.title'), T('how.03.body')],
+    ['04', T('how.04.title'), T('how.04.body')],
+  ];
+
+  const DIFF = [
+    [T('diff.01.title'), T('diff.01.body')],
+    [T('diff.02.title'), T('diff.02.body')],
+    [T('diff.03.title'), T('diff.03.body')],
+    [T('diff.04.title'), T('diff.04.body')],
+  ];
+
   return (
     <div>
-      {/* HERO */}
       <section className="bg-mist border-b border-line">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10 md:py-20 grid md:grid-cols-[1.2fr_1fr] gap-8 md:gap-12 items-center">
           <div>
-            <Chip tone="paper" className="mb-3">Bengaluru · 198 wards · live</Chip>
+            <Chip tone="paper" className="mb-3">{T('landing.chip')}</Chip>
             <h1 className="font-hand font-bold text-coffee leading-[.95] tracking-tight text-5xl md:text-7xl">
               The city,<br/>
               <span className="text-olive">filing back.</span>
             </h1>
-            <p className="font-kn text-coffee/70 mt-4 text-base md:text-lg">{t(lang, 'app.tagline')}</p>
-            <p className="font-sans text-coffee mt-5 max-w-xl text-[14.5px] md:text-base leading-relaxed">
-              Photograph any civic issue — pothole, garbage, leak, dead light. Our agents
-              file it across 30+ agencies, bundle it with your neighbours' reports,
-              and track it on a public dashboard until it's fixed.
-            </p>
+            <p className="font-kn text-coffee/70 mt-4 text-base md:text-lg">{T('app.tagline')}</p>
+            <p className="font-sans text-coffee mt-5 max-w-xl text-[14.5px] md:text-base leading-relaxed">{T('landing.body')}</p>
             <div className="flex flex-wrap gap-3 items-center mt-7">
-              <Button as={Link} to="/install" variant="primary" size="lg">{t(lang, 'cta.install')} →</Button>
-              <Button as={Link} to="/dashboard" variant="secondary" size="lg">{t(lang, 'cta.dashboard')}</Button>
-              <span className="font-sans text-[12px] text-coffee/60 ml-1">↳ scan QR · install on phone</span>
+              <Button as={Link} to="/install" variant="primary" size="lg">{T('cta.install')} →</Button>
+              <Button as={Link} to="/dashboard" variant="secondary" size="lg">{T('cta.dashboard')}</Button>
+              <span className="font-sans text-[12px] text-coffee/60 ml-1">{T('landing.scanqr')}</span>
             </div>
-
-            {/* social proof strip */}
             <div className="border-t border-dashed border-beige mt-8 pt-4 flex gap-6 md:gap-10 font-sans text-[12px] text-coffee/65">
               {[
-                [stats.open.toLocaleString(), 'open'],
-                [stats.resolved.toLocaleString(), 'resolved'],
-                [stats.wardsReporting, 'wards'],
-                ['30+', 'agencies routed']
+                [stats.open.toLocaleString(), T('stat.open')],
+                [stats.resolved.toLocaleString(), T('stat.resolved')],
+                [stats.wardsReporting, T('stat.wards')],
+                ['30+', T('stat.agencies')]
               ].map(([k, v]) => (
                 <div key={v}>
                   <div className="font-hand text-[22px] text-coffee font-bold leading-none">{k}</div>
@@ -46,15 +53,34 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* phone mockup */}
-          <div className="relative h-[360px] md:h-[440px] hidden md:flex items-center justify-center">
-            <div className="phone-frame w-[200px] h-[400px] -rotate-[4deg] relative">
-              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-16 h-3.5 bg-ink rounded-full" />
-              <div className="img-x absolute inset-x-3 top-7 bottom-14" />
-              <div className="absolute bottom-5 left-0 right-0 flex justify-center">
-                <div className="w-12 h-12 rounded-full bg-olive border-[3px] border-paper" style={{ boxShadow: '0 0 0 1.5px #2a221b' }} />
+          <div className="relative h-[360px] md:h-[440px] hidden md:flex items-center justify-center select-none">
+            <div className="phone-frame w-[200px] h-[400px] -rotate-[4deg] relative overflow-hidden">
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-ink rounded-full z-10" />
+              <div className="absolute inset-[6px] top-[6px] rounded-[30px] bg-[#1a1a1a] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center px-5 pt-10 pb-1">
+                  <span className="text-white/60 text-[8px] font-mono">9:41</span>
+                  <span className="text-white/60 text-[8px] font-mono">●●●</span>
+                </div>
+                <div className="flex-1 relative mx-3 mb-3 rounded-2xl overflow-hidden bg-[#111]">
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #2a3a2a 0%, #1a2a1a 40%, #0f1a0f 100%)' }} />
+                  <div className="absolute inset-5">
+                    <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/70 rounded-tl" />
+                    <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/70 rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/70 rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/70 rounded-br" />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full border-2 border-white/50" />
+                  </div>
+                  <div className="absolute top-3 left-3 bg-olive/90 text-white text-[8px] font-sans font-semibold px-2 py-0.5 rounded-full">AI · Auto-routing</div>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-sans px-2.5 py-1 rounded-full whitespace-nowrap">Pothole detected · Ward 95</div>
+                </div>
+                <div className="flex justify-center pb-4">
+                  <div className="w-12 h-12 rounded-full bg-white/10 border-2 border-white/30 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-white/90" />
+                  </div>
+                </div>
               </div>
-              <div className="absolute top-12 left-0 right-0 text-center font-hand text-mist/90 text-[13px]" style={{ textShadow: '0 1px 2px rgba(0,0,0,.5)' }}>viewfinder</div>
             </div>
             <div className="absolute top-6 right-2 rotate-[6deg]">
               <Card tone="coffee" padding="px-3 py-2" className="font-sans text-[11px] font-semibold">
@@ -66,18 +92,12 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
       <section className="bg-paper">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-12 md:py-16">
-          <Chip tone="paper" className="mb-2">How it works</Chip>
-          <h2 className="font-hand text-3xl md:text-4xl text-coffee mb-6">From photo to fixed.</h2>
+          <Chip tone="paper" className="mb-2">{T('landing.how.chip')}</Chip>
+          <h2 className="font-hand text-3xl md:text-4xl text-coffee mb-6">{T('landing.how.head')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              ['01', 'Capture',  'Photo + voice. Auto-located. Kannada or English.'],
-              ['02', 'Bundle',   '37 nearby reports merge into one signal.'],
-              ['03', 'Route',    '30+ agencies. Twitter, email, BBMP portal.'],
-              ['04', 'Track',    '30-day escalation ladder. Public.']
-            ].map(([n, h, p]) => (
+            {HOW.map(([n, h, p]) => (
               <Card key={n} tone="paper" padding="p-4">
                 <div className="font-mono text-[10px] tracking-wider text-olive mb-1.5">{n}</div>
                 <div className="font-hand text-xl text-coffee leading-tight font-bold mb-1.5">{h}</div>
@@ -88,18 +108,12 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* DIFFERENTIATORS */}
       <section className="bg-coffee text-mist">
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-12 md:py-16">
-          <Chip tone="ghost" className="mb-2 border-mist/40 text-mist">The moat</Chip>
-          <h2 className="font-hand text-3xl md:text-4xl mb-6">Why one voice now matters.</h2>
+          <Chip tone="ghost" className="mb-2 border-mist/40 text-mist">{T('landing.moat.chip')}</Chip>
+          <h2 className="font-hand text-3xl md:text-4xl mb-6">{T('landing.moat.head')}</h2>
           <div className="grid md:grid-cols-2 gap-4">
-            {[
-              ['Crowd Validation', 'One pothole report gets ignored. 47 bundled reports get fixed. AI does political organising automatically.'],
-              ['Escalation Ladder', 'Day 7 councillor tag → Day 14 RTI → Day 21 MLA + media → Day 30 PIL.'],
-              ['Public Dashboard',  'Live ward-level civic-health map. Officials change behaviour when measured.'],
-              ['Multi-Agency Routing', '30+ agencies pre-mapped. Most citizens file to wrong place; we don\'t.']
-            ].map(([t1, p]) => (
+            {DIFF.map(([t1, p]) => (
               <div key={t1} className="border-l-2 border-olive pl-4">
                 <div className="font-hand font-bold text-2xl">{t1}</div>
                 <div className="font-sans text-[13px] text-mist/80 mt-1.5 leading-relaxed">{p}</div>

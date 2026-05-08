@@ -1,5 +1,6 @@
 import { Card, Chip, Button } from '../components/ui';
 import { Link } from 'react-router-dom';
+import { useT } from '../lib/i18n';
 
 function FauxQR({ size = 220 }) {
   const grid = 25;
@@ -26,23 +27,23 @@ function FauxQR({ size = 220 }) {
 }
 
 export default function Install() {
+  const T = useT();
   return (
     <section className="max-w-[1280px] mx-auto px-4 md:px-8 py-10 md:py-16 grid md:grid-cols-2 gap-10 items-center">
       <div>
-        <Chip>Install · ಸ್ಥಾಪಿಸಿ</Chip>
+        <Chip>{T('install.chip')}</Chip>
         <h1 className="font-hand font-bold text-coffee text-4xl md:text-6xl leading-[.95] mt-2 tracking-tight">
-          Carry the city<br />in your pocket.
+          {T('install.heading')}
         </h1>
-        <p className="font-kn text-coffee/70 text-base mt-3">ನಗರವನ್ನು ಜೇಬಿನಲ್ಲಿ ಇಟ್ಟುಕೊಳ್ಳಿ.</p>
+        <p className="font-kn text-coffee/70 text-base mt-3">{T('install.subtitle')}</p>
         <p className="font-sans text-[14px] text-coffee mt-5 max-w-md leading-relaxed">
-          NammaCity is a Progressive Web App. No app store. No 60-MB download.
-          Scan the code, tap "Add to Home Screen", and you're filing complaints in 30 seconds.
+          {T('install.body')}
         </p>
         <ol className="mt-6 space-y-3">
           {[
-            ['Scan the QR with your phone camera', 'iPhone or Android · works offline once installed'],
-            ['Tap "Add to Home Screen"',           'Looks and behaves like a native app'],
-            ['Open NammaCity → start filing',      'First-time onboarding takes 90 seconds']
+            [T('install.step1.h'), T('install.step1.s')],
+            [T('install.step2.h'), T('install.step2.s')],
+            [T('install.step3.h'), T('install.step3.s')],
           ].map(([h, s], i) => (
             <li key={i} className="flex gap-3 items-start">
               <span className="font-mono text-[12px] text-olive font-semibold pt-0.5">0{i + 1}</span>
@@ -54,8 +55,8 @@ export default function Install() {
           ))}
         </ol>
         <div className="mt-7 flex flex-wrap gap-3 items-center">
-          <Button as={Link} to="/onboard" variant="secondary" size="md">Start onboarding →</Button>
-          <span className="font-sans text-[11px] text-coffee/55">or visit <span className="font-mono text-olive">nammacity.org</span> on your phone</span>
+          <Button as={Link} to="/onboard" variant="secondary" size="md">{T('install.cta')}</Button>
+          <span className="font-sans text-[11px] text-coffee/55">{T('install.visit')} <span className="font-mono text-olive">nammacity.org</span></span>
         </div>
       </div>
 
@@ -65,7 +66,7 @@ export default function Install() {
           <FauxQR size={220} />
           <div className="text-center mt-4">
             <div className="font-hand text-coffee text-lg font-bold">NammaCity · ನಮ್ಮಸಿಟಿ</div>
-            <div className="font-mono text-[9px] tracking-wider text-olive">SCAN TO INSTALL</div>
+            <div className="font-mono text-[9px] tracking-wider text-olive">{T('install.scan')}</div>
           </div>
         </Card>
         <div className="mt-5 flex gap-3 font-sans text-[10px] text-coffee/65">
