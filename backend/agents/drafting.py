@@ -7,7 +7,7 @@ in parallel via ADK LlmAgent-backed generate_text calls.
 import asyncio
 import logging
 
-from agents.adk_client import generate_text, make_agent, _run_agent_once
+from agents.adk_client import make_agent, _run_agent_once
 from agents.base import AgentInput, AgentOutput, BaseAgent
 from google.adk.agents import LlmAgent
 from google.genai.types import Part
