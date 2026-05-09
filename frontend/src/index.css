@@ -90,12 +90,8 @@ body {
 /* prevent FOUC for hand fonts */
 .font-hand, .font-sketch { -webkit-font-smoothing: subpixel-antialiased; }
 
-/* status bar + gesture nav bleed for installed PWA */
+/* status bar bleed for installed PWA */
 @supports (padding: max(0px)) {
-  .pt-safe { padding-top:    max(env(safe-area-inset-top),    0.5rem); }
+  .pt-safe { padding-top: max(env(safe-area-inset-top), 0.5rem); }
   .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
-  .pl-safe { padding-left:   max(env(safe-area-inset-left),   0px);    }
-  .pr-safe { padding-right:  max(env(safe-area-inset-right),  0px);    }
-  /* Extra padding for the Android gesture-nav handle at bottom */
-  .pb-nav-safe { padding-bottom: max(env(safe-area-inset-bottom), 1.5rem); }
 }
