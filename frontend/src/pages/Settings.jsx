@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Chip, Toggle, LanguageToggle } from '../components/ui';
 import { useApp } from '../lib/store';
 import { useT } from '../lib/i18n';
+import { signOut as firebaseSignOut } from '../lib/firebase';
 
 const CHANNEL_DEFS = [
   { key: 'email',   label: 'Email',       sym: '@' },
@@ -105,9 +106,18 @@ export default function Settings() {
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(user.name || '');
 
-  const handleSignOut = () => {
+  // Auto-fill email channel from Firebase auth email if not already connected
+  useEffect(() => {
+    if (user.email && !channels.email?.connected) {
+      setChannel('email', { connected: true, value: user.email });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.email]);
+
+  const handleSignOut = async () => {
+    try { await firebaseSignOut(); } catch (_) {}
     signOut();
-    navigate('/');
+    navigate('/auth');
   };
 
   const saveName = () => {
@@ -149,6 +159,9 @@ export default function Settings() {
             <>
               <div className="font-sans font-semibold text-coffee text-[13px]">{user.name}</div>
               <div className="font-mono text-[10px] text-olive">citizen-id · {user.id}</div>
+              {user.email && (
+                <div className="font-sans text-[10px] text-coffee/65">{user.email}</div>
+              )}
               <div className="font-sans text-[10px] text-coffee/65">Ward {user.wardId} · Yelahanka</div>
             </>
           )}

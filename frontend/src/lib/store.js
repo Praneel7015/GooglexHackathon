@@ -18,7 +18,7 @@ export const useApp = create(persist((set, get) => ({
     autoTweet7d:  true,
     fileAnonymous:false
   },
-  user: { name: '', id: null, wardId: null },
+  user: { name: '', id: null, wardId: null, email: '', firebaseUid: null },
 
   // ── In-flight complaint ───────────────────────────────────────────
   current: {
@@ -47,6 +47,8 @@ export const useApp = create(persist((set, get) => ({
 
   setOnboarded: (v) => set({ onboarded: v }),
 
+  setUser: (u) => set((s) => ({ user: { ...s.user, ...u } })),
+
   setChannel: (key, patch) => set((s) => ({
     channels: { ...s.channels, [key]: { ...s.channels[key], ...patch } }
   })),
@@ -57,7 +59,7 @@ export const useApp = create(persist((set, get) => ({
 
   signOut: () => set({
     onboarded: false,
-    user: { name: '', id: null, wardId: null },
+    user: { name: '', id: null, wardId: null, email: '', firebaseUid: null },
     channels: {
       email:    { connected: false, value: '' },
       twitter:  { connected: false, value: '' },
