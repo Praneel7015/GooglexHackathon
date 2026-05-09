@@ -7,23 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon-mask.svg'],
-      manifest: {
-        name: 'NammaCity — ನಮ್ಮಸಿಟಿ',
-        short_name: 'NammaCity',
-        description: "Bengaluru's civic operating system. Photograph any civic issue, get it filed across 30+ agencies, bundled with your neighbours, tracked publicly.",
-        theme_color: '#342a21',
-        background_color: '#f1e0c5',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          { src: '/favicon.svg',   sizes: '64x64',   type: 'image/svg+xml' },
-          { src: '/icon-mask.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-        ],
-        categories: ['government', 'social', 'utilities']
-      },
+      includeAssets: ['favicon.ico', 'favicon.svg', 'favicon-96x96.png', 'apple-touch-icon.png', 'web-app-manifest-192x192.png', 'web-app-manifest-512x512.png'],
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,svg,png,ico,woff2}', 'index.html'],
         navigateFallback: '/index.html',
