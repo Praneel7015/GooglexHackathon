@@ -4,6 +4,17 @@ import { useT } from '../lib/i18n';
 import { useApp } from '../lib/store';
 import { signOut as firebaseSignOut } from '../lib/firebase';
 
+/* ── Admin check helper ─────────────────────────────────────────────── */
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdmin(email) {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 const TABS = [
   { to: '/capture',     labelKey: 'nav.file',      icon: 'camera' },
   { to: '/track',       labelKey: 'nav.track',     icon: 'list' },
@@ -19,7 +30,8 @@ const ICONS = {
   gear:   <path d="M12 8 a4 4 0 1 0 .01 0 M12 4 v2 M12 18 v2 M4 12 h2 M18 12 h2 M6.3 6.3 l1.4 1.4 M16.3 16.3 l1.4 1.4 M6.3 17.7 l1.4 -1.4 M16.3 7.7 l1.4 -1.4" />,
   chart:  <path d="M3 3v18h18 M7 14l4-4 4 4 4-8" strokeLinejoin="round" />,
   user:   <path d="M12 11a4 4 0 100-8 4 4 0 000 8z M4 21a8 8 0 0116 0" />,
-  logout: <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 M16 17l5-5-5-5 M21 12H9" />
+  logout: <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 M16 17l5-5-5-5 M21 12H9" />,
+  shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
 };
 
 function Icon({ name, active, color }) {
@@ -36,6 +48,7 @@ export default function AppShell() {
   const T = useT();
   const navigate = useNavigate();
   const { user, signOut } = useApp();
+  const userIsAdmin = isAdmin(user?.email);
 
   const handleSignOut = async () => {
     try { await firebaseSignOut(); } catch (_) {}
@@ -43,7 +56,6 @@ export default function AppShell() {
     navigate('/auth');
   };
 
-  // Initials for avatar
   const initials = (user?.name || '?').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
 
   return (
@@ -51,14 +63,16 @@ export default function AppShell() {
       {/* ── Mobile top bar ── */}
       <header className="md:hidden flex items-center justify-between px-4 pt-safe pb-2 border-b border-line/20">
         <Link to="/"><Logo size={26} withText /></Link>
-        <button
-          onClick={handleSignOut}
-          title="Sign out"
-          className="flex items-center gap-1.5 font-sans text-[11px] text-coffee/60 hover:text-rust transition-colors"
-        >
-          <Icon name="logout" color="currentColor" />
-          <span className="sr-only">Sign out</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {userIsAdmin && (
+            <Link to="/admin" className="font-sans text-[10px] font-semibold text-olive border border-olive/40 rounded-full px-2 py-0.5">
+              Admin
+            </Link>
+          )}
+          <button onClick={handleSignOut} title="Sign out" className="text-coffee/60 hover:text-rust transition-colors">
+            <Icon name="logout" color="currentColor" />
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex md:flex-row flex-col">
@@ -77,9 +91,20 @@ export default function AppShell() {
             </NavLink>
           ))}
 
+          {/* Admin nav item — only for admins */}
+          {userIsAdmin && (
+            <NavLink to="/admin" className={({ isActive }) =>
+              ['rounded-md px-3 py-2 font-sans text-sm flex items-center gap-2 transition-colors mt-1 border-t border-mist/10 pt-3',
+                isActive ? 'bg-olive text-mist font-semibold' : 'text-olive/80 hover:bg-olive/20'
+              ].join(' ')
+            }>
+              <Icon name="shield" active={false} color="currentColor" />
+              <span>Admin</span>
+            </NavLink>
+          )}
+
           {/* ── Sidebar bottom: user + logout ── */}
           <div className="mt-auto pt-4 border-t border-mist/15 flex flex-col gap-2">
-            {/* User pill */}
             {user?.name && (
               <div className="flex items-center gap-2 px-1">
                 <div className="w-7 h-7 rounded-full bg-olive text-mist flex items-center justify-center font-hand text-[13px] font-bold shrink-0">
@@ -87,14 +112,10 @@ export default function AppShell() {
                 </div>
                 <div className="min-w-0">
                   <div className="font-sans text-[11px] font-semibold text-mist/90 truncate">{user.name}</div>
-                  {user.email && (
-                    <div className="font-mono text-[9px] text-mist/45 truncate">{user.email}</div>
-                  )}
+                  {user.email && <div className="font-mono text-[9px] text-mist/45 truncate">{user.email}</div>}
                 </div>
               </div>
             )}
-
-            {/* Logout button */}
             <button
               onClick={handleSignOut}
               className="flex items-center gap-2 rounded-md px-3 py-2 font-sans text-sm text-mist/60 hover:bg-rust/20 hover:text-rust transition-colors w-full text-left"
@@ -102,7 +123,6 @@ export default function AppShell() {
               <Icon name="logout" color="currentColor" />
               <span>Sign out</span>
             </button>
-
             <div className="text-[10px] opacity-35 font-mono px-1">v0.1.0 · open civic</div>
           </div>
         </aside>

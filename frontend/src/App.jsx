@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from './lib/store';
 
 import PublicShell from './components/PublicShell';
-import AppShell from './components/AppShell';
+import AppShell, { isAdmin } from './components/AppShell';
 
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
@@ -19,6 +19,7 @@ import Crowd from './pages/Crowd';
 import Track from './pages/Track';
 import Settings from './pages/Settings';
 import Auth from './pages/Auth';
+import Admin from './pages/Admin';
 
 /** Guard: if user is not authenticated (no firebaseUid), redirect to /auth */
 function RequireAuth({ children }) {
@@ -31,6 +32,15 @@ function RequireAuth({ children }) {
 function GuestOnly({ children }) {
   const firebaseUid = useApp(s => s.user.firebaseUid);
   if (firebaseUid) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+/** Guard: only admin emails can access — others go to /dashboard */
+function RequireAdmin({ children }) {
+  const email = useApp(s => s.user.email);
+  const firebaseUid = useApp(s => s.user.firebaseUid);
+  if (!firebaseUid) return <Navigate to="/auth" replace />;
+  if (!isAdmin(email)) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -62,6 +72,9 @@ export default function App() {
         <Route path="/track"        element={<Track />} />
         <Route path="/track/:id"    element={<Track />} />
         <Route path="/settings"     element={<Settings />} />
+
+        {/* Admin — only for emails listed in VITE_ADMIN_EMAILS */}
+        <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
