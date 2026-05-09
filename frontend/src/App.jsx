@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useApp } from './lib/store';
 
 import PublicShell from './components/PublicShell';
 import AppShell from './components/AppShell';
@@ -17,10 +18,28 @@ import Confirm from './pages/capture/Confirm';
 import Crowd from './pages/Crowd';
 import Track from './pages/Track';
 import Settings from './pages/Settings';
+import Auth from './pages/Auth';
+
+/** Guard: if user is not authenticated (no firebaseUid), redirect to /auth */
+function RequireAuth({ children }) {
+  const firebaseUid = useApp(s => s.user.firebaseUid);
+  if (!firebaseUid) return <Navigate to="/auth" replace />;
+  return children;
+}
+
+/** Guard: if user is already authenticated, redirect away from /auth */
+function GuestOnly({ children }) {
+  const firebaseUid = useApp(s => s.user.firebaseUid);
+  if (firebaseUid) return <Navigate to="/dashboard" replace />;
+  return children;
+}
 
 export default function App() {
   return (
     <Routes>
+      {/* Auth page (public, redirects away if already logged in) */}
+      <Route path="/auth" element={<GuestOnly><Auth /></GuestOnly>} />
+
       {/* Capture flow + connect render their own PhoneFrame, so no shell. */}
       <Route path="/connect"      element={<Connect />} />
       <Route path="/capture"      element={<Capture />} />
@@ -34,8 +53,8 @@ export default function App() {
         <Route path="/"             element={<Landing />} />
       </Route>
 
-      {/* App shell with bottom nav + sidebar */}
-      <Route element={<AppShell />}>
+      {/* App shell with bottom nav + sidebar — all protected */}
+      <Route element={<RequireAuth><AppShell /></RequireAuth>}>
         <Route path="/onboard"      element={<Onboarding />} />
         <Route path="/dashboard"    element={<Dashboard />} />
         <Route path="/leaderboard"  element={<Leaderboard />} />
