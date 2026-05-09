@@ -8,7 +8,7 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, Form, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ from db.client import (
     get_map_complaints,
     get_ward_officer,
     insert_complaint,
+    update_complaint_status,
 )
 from integrations.qdrant_client import ensure_collection
 
@@ -498,6 +499,37 @@ async def get_complaint(complaint_id: str) -> dict:
             "timeline": timeline,
         },
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin routes (protected by X-Admin-Token header)
+# ─────────────────────────────────────────────────────────────────────────────
+
+ALLOWED_STATUSES = {"open", "in_progress", "resolved", "revoked"}
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+@app.patch("/api/v1/admin/complaints/{complaint_id}/status")
+async def admin_update_status(
+    complaint_id: str,
+    body: StatusUpdate,
+    x_admin_token: str | None = Header(default=None),
+) -> dict:
+    """Update a complaint's status. Requires X-Admin-Token header."""
+    if not x_admin_token or x_admin_token != settings.admin_secret:
+        raise HTTPException(status_code=401, detail="Unauthorised: invalid admin token")
+    if body.status not in ALLOWED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Allowed: {', '.join(ALLOWED_STATUSES)}",
+        )
+    updated = await update_complaint_status(complaint_id, body.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    return {"ok": True, "id": complaint_id, "status": body.status, "complaint": updated}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -69,6 +69,19 @@ export const api = {
   /** Single complaint with escalation timeline. */
   getComplaint: (id) => safeFetch(`${BASE_URL}/api/v1/complaints/${id}`),
 
+  /** Admin: update complaint status. Requires admin secret. */
+  updateComplaintStatus: (id, status) => safeFetch(
+    `${BASE_URL}/api/v1/admin/complaints/${id}/status`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': import.meta.env.VITE_ADMIN_SECRET || '',
+      },
+      body: JSON.stringify({ status }),
+    }
+  ),
+
   /** Health check. */
   health: () => safeFetch(`${BASE_URL}/health`),
 };
