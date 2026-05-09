@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Chip, Toggle, LanguageToggle } from '../components/ui';
 import { useApp } from '../lib/store';
@@ -105,6 +105,14 @@ export default function Settings() {
   const navigate = useNavigate();
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(user.name || '');
+
+  // Auto-fill email channel from Firebase auth email if not already connected
+  useEffect(() => {
+    if (user.email && !channels.email?.connected) {
+      setChannel('email', { connected: true, value: user.email });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.email]);
 
   const handleSignOut = async () => {
     try { await firebaseSignOut(); } catch (_) {}

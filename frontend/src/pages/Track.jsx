@@ -30,7 +30,7 @@ function ComplaintList({ complaints, navigate }) {
 
   if (complaints.length === 0) {
     return (
-      <div className="max-w-md mx-auto p-6 flex flex-col items-center gap-4 mt-10">
+      <div className="max-w-md mx-auto p-6 flex flex-col items-center justify-center gap-4 min-h-[calc(100dvh-110px)]">
         <div className="w-14 h-14 rounded-full bg-mist border-[1.5px] border-line flex items-center justify-center">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
             <path d="M5 7 H19 M5 12 H19 M5 17 H12" />

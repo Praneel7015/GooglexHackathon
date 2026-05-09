@@ -29,6 +29,12 @@ export default function PublicShell({ floatingHeader = false }) {
           </nav>
           <div className="flex-1" />
           <LanguageToggle />
+          <Link
+            to="/auth"
+            className="hidden md:inline-flex items-center gap-1.5 font-sans text-[12.5px] font-semibold text-coffee hover:text-olive transition-colors"
+          >
+            Sign In
+          </Link>
           <Button as="button" variant="primary" size="sm" className="hidden md:inline-flex" onClick={() => { window.location.href = '/#install'; }}>{T('nav.openapp')}</Button>
           <button
             onClick={() => setOpen(o => !o)}
@@ -46,6 +52,13 @@ export default function PublicShell({ floatingHeader = false }) {
               {NAV.map(n => (
                 <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="py-1.5">{T(n.labelKey)}</Link>
               ))}
+              <Link
+                to="/auth"
+                onClick={() => setOpen(false)}
+                className="py-1.5 font-sans text-[13px] font-semibold text-olive"
+              >
+                Sign In →
+              </Link>
               <Button as="button" variant="primary" size="md" full onClick={() => { setOpen(false); window.location.href = '/#install'; }}>{T('nav.openapp')}</Button>
             </div>
           </div>

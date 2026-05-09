@@ -51,7 +51,7 @@ const GoogleIcon = () => (
 /* ─── Main Component ────────────────────────────────────────────────── */
 export default function Auth() {
   const navigate = useNavigate();
-  const { setUser, setOnboarded, channels } = useApp();
+  const { setUser, setOnboarded } = useApp();
 
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'reset'
   const [email, setEmail]       = useState('');
@@ -63,7 +63,7 @@ export default function Auth() {
 
   const isOnboarded = useApp(s => s.onboarded);
 
-  const afterAuth = (u) => {
+  const afterAuth = (u, isNewUser = false) => {
     setUser({
       firebaseUid: u.uid,
       name: u.name || u.email?.split('@')[0] || 'Citizen',
@@ -71,8 +71,8 @@ export default function Auth() {
       id: u.uid?.slice(0, 8),
     });
     setOnboarded(true);
-    // If channels already filled → go straight to settings; else go to settings
-    navigate('/settings');
+    // New users → onboarding; returning users → dashboard
+    navigate(isNewUser ? '/onboard' : '/dashboard');
   };
 
   const handleEmail = async (e) => {
@@ -85,10 +85,11 @@ export default function Auth() {
       if (mode === 'signup') {
         u = await signUpWithEmail(email, password);
         if (name) setUser({ name });
+        afterAuth(u, true);  // new user → onboarding
       } else {
         u = await signInWithEmail(email, password);
+        afterAuth(u, false); // returning user → dashboard
       }
-      afterAuth(u);
     } catch (ex) {
       const map = {
         'auth/email-already-in-use': 'Email already registered. Try signing in.',
@@ -110,7 +111,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const u = await signInWithGoogle();
-      afterAuth(u);
+      afterAuth(u, true); // always show onboarding (has skip button)
     } catch (ex) {
       if (ex.code !== 'auth/popup-closed-by-user') {
         setErr(ex.message);
