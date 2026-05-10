@@ -28,9 +28,10 @@ export default function Confirm() {
   const emailChannel = backendChannels.find(c => c.channel === 'email');
   const twitterChannel = backendChannels.find(c => c.channel === 'twitter');
   const emailSent = emailChannel?.status === 'success';
-  const emailMode = emailChannel?.mode;
+  const emailSkipped = emailChannel?.status === 'skipped';
   const twitterSent = twitterChannel?.status === 'success';
   const twitterFailed = twitterChannel?.status === 'failed';
+  const twitterSkipped = twitterChannel?.status === 'skipped';
 
   useEffect(() => {
     if (!backendChannels.length) return;
@@ -122,26 +123,28 @@ export default function Confirm() {
             <div className="font-sans text-[9px] uppercase tracking-wider text-coffee/65 mb-1.5">Dispatch Status</div>
             <div className="space-y-1.5">
               {/* Email */}
-              <Card padding="px-2.5 py-1.5" className="flex items-center gap-2">
-                <span className={'w-2 h-2 rounded-full ' + (emailSent ? 'bg-olive' : 'bg-beige animate-pulse-soft')} />
-                <span className="font-sans text-[11px] font-semibold text-coffee">Email</span>
-                <span className="font-mono text-[10px] text-coffee/65">
-                  {emailSent ? 'sent to ward officer' : 'sending...'}
-                </span>
-                <span className={'ml-auto font-sans text-[11px] font-semibold ' + (emailSent ? 'text-olive' : 'text-coffee/55')}>
-                  {emailSent ? '✓' : '…'}
-                </span>
-              </Card>
-              {/* Twitter — show only if it succeeded or was attempted */}
+              {emailChannel && (
+                <Card padding="px-2.5 py-1.5" className="flex items-center gap-2">
+                  <span className={'w-2 h-2 rounded-full ' + (emailSent ? 'bg-olive' : emailSkipped ? 'bg-coffee/30' : 'bg-beige animate-pulse-soft')} />
+                  <span className="font-sans text-[11px] font-semibold text-coffee">Email</span>
+                  <span className="font-mono text-[10px] text-coffee/65">
+                    {emailSent ? 'sent to ward officer' : emailSkipped ? 'disabled in settings' : 'sending...'}
+                  </span>
+                  <span className={'ml-auto font-sans text-[11px] font-semibold ' + (emailSent ? 'text-olive' : emailSkipped ? 'text-coffee/40' : 'text-coffee/55')}>
+                    {emailSent ? '✓' : emailSkipped ? '—' : '…'}
+                  </span>
+                </Card>
+              )}
+              {/* Twitter */}
               {twitterChannel && (
                 <Card padding="px-2.5 py-1.5" className="flex items-center gap-2">
-                  <span className={'w-2 h-2 rounded-full ' + (twitterSent ? 'bg-olive' : twitterFailed ? 'bg-rust' : 'bg-beige animate-pulse-soft')} />
+                  <span className={'w-2 h-2 rounded-full ' + (twitterSent ? 'bg-olive' : twitterSkipped ? 'bg-coffee/30' : twitterFailed ? 'bg-rust' : 'bg-beige animate-pulse-soft')} />
                   <span className="font-sans text-[11px] font-semibold text-coffee">Twitter</span>
                   <span className="font-mono text-[10px] text-coffee/65">
-                    {twitterSent ? cur.backendResult?.routing?.twitter_handle || '@BBMPCOMM' : twitterFailed ? 'billing pending' : 'posting...'}
+                    {twitterSent ? (cur.backendResult?.routing?.twitter_handle || '@BBMPCOMM') : twitterSkipped ? 'disabled in settings' : twitterFailed ? 'failed' : 'posting...'}
                   </span>
-                  <span className={'ml-auto font-sans text-[11px] font-semibold ' + (twitterSent ? 'text-olive' : twitterFailed ? 'text-rust' : 'text-coffee/55')}>
-                    {twitterSent ? '✓' : twitterFailed ? '✗' : '…'}
+                  <span className={'ml-auto font-sans text-[11px] font-semibold ' + (twitterSent ? 'text-olive' : twitterSkipped ? 'text-coffee/40' : twitterFailed ? 'text-rust' : 'text-coffee/55')}>
+                    {twitterSent ? '✓' : twitterSkipped ? '—' : twitterFailed ? '✗' : '…'}
                   </span>
                 </Card>
               )}

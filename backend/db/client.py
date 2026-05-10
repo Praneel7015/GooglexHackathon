@@ -238,3 +238,19 @@ async def get_escalations_for_complaint(complaint_id: str) -> list[dict]:
         .execute()
     )
     return result.data or []
+
+
+async def upload_photo(complaint_id: str, photo_bytes: bytes) -> str | None:
+    """Upload photo to Supabase Storage and return public URL."""
+    try:
+        client = get_client()
+        path = f"complaints/{complaint_id}.jpg"
+        client.storage.from_("photos").upload(
+            path, photo_bytes, {"content-type": "image/jpeg"}
+        )
+        url = client.storage.from_("photos").get_public_url(path)
+        return url
+    except Exception as e:
+        import logging
+        logging.getLogger("nammacity.db").warning("Photo upload failed: %s", e)
+        return None

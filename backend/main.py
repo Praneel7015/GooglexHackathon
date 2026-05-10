@@ -33,6 +33,7 @@ from db.client import (
     get_ward_officer,
     insert_complaint,
     update_complaint_status,
+    upload_photo,
 )
 from integrations.qdrant_client import ensure_collection
 
@@ -215,6 +216,11 @@ async def report(
         except Exception as e:
             logger.warning("DB insert failed (non-fatal): %s", e)
 
+    # ── Step 4b: Upload photo to Supabase Storage ────────────────────────────
+    photo_url = None
+    if complaint.get("id") and photo_bytes:
+        photo_url = await upload_photo(complaint["id"], photo_bytes)
+
     # ── Step 5: Crowd Validation Agent ────────────────────────────────────────
     crowd_result = None
     if complaint.get("id") and geo_result.success:
@@ -258,6 +264,7 @@ async def report(
                 "user_email": user_email,
                 "skip_twitter": bool(skip_twitter),
                 "skip_email": bool(skip_email),
+                "photo_url": photo_url,
             })
         )
 

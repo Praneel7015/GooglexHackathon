@@ -48,6 +48,7 @@ class SubmissionAgent(BaseAgent):
         user_email = d.get("user_email")
         skip_twitter = d.get("skip_twitter", False)
         skip_email = d.get("skip_email", False)
+        photo_url = d.get("photo_url")
 
         is_bundled = crowd.get("is_bundled", False)
         cluster_id = crowd.get("cluster_id")
@@ -87,12 +88,23 @@ class SubmissionAgent(BaseAgent):
         if email_kn:
             email_body = email_body + "<hr/><h3>ಕನ್ನಡ ಅನುವಾದ</h3>" + email_kn
 
+        # Append photo to email if available
+        if photo_url:
+            email_body += f'<br/><h4>Photo Evidence</h4><img src="{photo_url}" alt="Complaint photo" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:4px;"/>'
+
+        # Build tweet text — append photo URL so X shows preview
+        tweet_text = drafting.get("tweet_text", "")
+        if photo_url and tweet_text:
+            # X auto-previews image URLs — append if it fits in 280 chars
+            if len(tweet_text) + len(photo_url) + 1 <= 280:
+                tweet_text = f"{tweet_text} {photo_url}"
+
         # Build payloads
         tweet_payload = SubmissionPayload(
             complaint_id=complaint_id,
             correlation_id=f"tweet-{complaint_id[:8]}",
-            subject=drafting.get("tweet_text", ""),
-            body_text=drafting.get("tweet_text", ""),
+            subject=tweet_text,
+            body_text=tweet_text,
             twitter_handle=twitter_handle,
         )
 
