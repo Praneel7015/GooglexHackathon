@@ -101,10 +101,12 @@ export default function Agents() {
         // stays active — just don't advance past the end.
       }, 2500);
 
-      // Get user info from store for user-attribution
+      // Get user info and channel preferences from store
       const state = useApp.getState();
       const userName = state.user?.name || undefined;
       const userEmail = state.channels?.email?.connected ? state.channels.email.value : undefined;
+      const skipTwitter = !state.channels?.twitter?.connected;
+      const skipEmail = !state.channels?.email?.connected;
 
       // Real backend call
       const result = await api.submitReport({
@@ -114,6 +116,8 @@ export default function Agents() {
         user_name: userName,
         user_email: userEmail,
         voice_note: snapshot.voiceBlob || undefined,
+        skip_twitter: skipTwitter ? '1' : undefined,
+        skip_email: skipEmail ? '1' : undefined,
       });
 
       clearInterval(animTimer);

@@ -46,6 +46,8 @@ class SubmissionAgent(BaseAgent):
         routing = d.get("routing", {})
         crowd = d.get("crowd_validation", {})
         user_email = d.get("user_email")
+        skip_twitter = d.get("skip_twitter", False)
+        skip_email = d.get("skip_email", False)
 
         is_bundled = crowd.get("is_bundled", False)
         cluster_id = crowd.get("cluster_id")
@@ -111,15 +113,18 @@ class SubmissionAgent(BaseAgent):
             metadata={"whatsapp_contacts": [officer_phone] if officer_phone else []},
         )
 
-        # Run all 3 channels in parallel
+        # Run channels in parallel (skip if user toggled off)
+        from integrations.contracts import DeliveryResult as _DR, DeliveryStatus as _DS
+
+        async def _skip_result(channel: str) -> _DR:
+            return _DR(channel=channel, status=_DS.SKIPPED, attempts=0, elapsed_ms=0, error="user_disabled")
+
+        tweet_task = _skip_result("twitter") if skip_twitter else twitter_client.send(tweet_payload)
+        email_task = _skip_result("email") if skip_email else gmail_client.send(email_payload, cc=[user_email] if user_email else None, reply_to=user_email)
+        wa_task = whatsapp_client.send(wa_payload)
+
         tweet_result, email_result, wa_result = await asyncio.gather(
-            twitter_client.send(tweet_payload),
-            gmail_client.send(
-                email_payload,
-                cc=[user_email] if user_email else None,
-                reply_to=user_email,
-            ),
-            whatsapp_client.send(wa_payload),
+            tweet_task, email_task, wa_task,
         )
 
         channels = [

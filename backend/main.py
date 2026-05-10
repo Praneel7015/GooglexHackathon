@@ -134,6 +134,8 @@ async def report(
     fallback_lng: float | None = Form(None),
     user_name: str | None = Form(None),
     user_email: str | None = Form(None),
+    skip_twitter: str | None = Form(None),
+    skip_email: str | None = Form(None),
 ) -> dict:
     """
     Full complaint pipeline:
@@ -254,6 +256,8 @@ async def report(
                 "routing": routing_result.data if routing_result.success else {},
                 "crowd_validation": crowd_data,
                 "user_email": user_email,
+                "skip_twitter": bool(skip_twitter),
+                "skip_email": bool(skip_email),
             })
         )
 

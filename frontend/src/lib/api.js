@@ -35,7 +35,7 @@ async function safeFetch(url, opts = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
 
 export const api = {
   /** Submit a complaint photo through the full 7-agent pipeline. */
-  submitReport: async ({ photo, fallback_lat, fallback_lng, user_name, user_email, voice_note }) => {
+  submitReport: async ({ photo, fallback_lat, fallback_lng, user_name, user_email, voice_note, skip_twitter, skip_email }) => {
     const fd = new FormData();
     fd.append('photo', photo);
     if (fallback_lat != null) fd.append('fallback_lat', String(fallback_lat));
@@ -43,6 +43,8 @@ export const api = {
     if (user_name) fd.append('user_name', user_name);
     if (user_email) fd.append('user_email', user_email);
     if (voice_note) fd.append('voice_note', voice_note);
+    if (skip_twitter) fd.append('skip_twitter', '1');
+    if (skip_email) fd.append('skip_email', '1');
 
     return safeFetch(`${BASE_URL}/api/v1/report`, { method: 'POST', body: fd }, REPORT_TIMEOUT_MS);
   },
