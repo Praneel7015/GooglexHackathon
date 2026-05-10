@@ -9,5 +9,4 @@ httpx
 python-dotenv
 pydantic-settings
 pillow
-twikit
 tenacity

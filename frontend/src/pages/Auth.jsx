@@ -70,6 +70,8 @@ export default function Auth() {
       email: u.email,
       id: u.uid?.slice(0, 8),
     });
+    // Auto-connect email channel so complaints CC the user
+    useApp.getState().setChannel('email', { connected: true, value: u.email });
     setOnboarded(true);
     // New users → onboarding; returning users → dashboard
     navigate(isNewUser ? '/onboard' : '/dashboard');
