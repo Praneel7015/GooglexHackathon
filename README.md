@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/icons/icon-192x192.png" alt="NammaCity Logo" width="120" />
+  <img src="frontend/public/web-app-manifest-512x512.png" alt="NammaCity Logo" width="120" />
 </p>
 
 <h1 align="center">NammaCity</h1>
