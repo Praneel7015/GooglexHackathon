@@ -8,3 +8,4 @@ dist-ssr
 .idea
 *.log
 .DS_Store
+.env.production
