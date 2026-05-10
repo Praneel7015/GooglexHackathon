@@ -92,12 +92,29 @@ class SubmissionAgent(BaseAgent):
         if photo_url:
             email_body += f'<br/><h4>Photo Evidence</h4><img src="{photo_url}" alt="Complaint photo" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:4px;"/>'
 
-        # Build tweet text — append photo URL so X shows preview
+        # Build tweet text with proper tagging
         tweet_text = drafting.get("tweet_text", "")
-        if photo_url and tweet_text:
-            # X auto-previews image URLs — append if it fits in 280 chars
+        issue_type = crowd.get("is_bundled") and "Joint Complaint" or (drafting.get("email_subject", "").split("—")[0].strip() if "—" in drafting.get("email_subject", "") else "Civic Issue")
+
+        # If Gemini failed to draft, use a strong template
+        if not tweet_text or len(tweet_text) < 20:
+            member_count = crowd.get("member_count", 1)
+            ward_name = routing.get("primary_agency", {}).get("name", "BBMP")
+            if member_count > 1:
+                tweet_text = f".@BBMPCOMM @CMofKarnataka URGENT: {member_count} residents report the same civic issue in Bengaluru. Crowd-verified complaint filed. Action demanded. #FixBangalore #NammaCity #BBMP"
+            else:
+                tweet_text = f".@BBMPCOMM Civic issue reported by citizen in Bengaluru via NammaCity. Formal complaint filed. Tracking live. #FixBangalore #NammaCity"
+
+        # Always ensure proper handles are tagged
+        if "@BBMPCOMM" not in tweet_text:
+            tweet_text = f".@BBMPCOMM {tweet_text}"
+
+        # Append photo URL if fits
+        if photo_url:
             if len(tweet_text) + len(photo_url) + 1 <= 280:
                 tweet_text = f"{tweet_text} {photo_url}"
+
+        tweet_text = tweet_text[:280]
 
         # Build payloads
         tweet_payload = SubmissionPayload(

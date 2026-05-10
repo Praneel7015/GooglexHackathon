@@ -21,10 +21,33 @@ from config import settings
 
 logger = logging.getLogger("nammacity.adk_client")
 
-# ── API key setup ─────────────────────────────────────────────────────────────
-_api_key = settings.gemini_api_key or settings.google_api_key
+# ── API key setup with rotation ──────────────────────────────────────────────
+# Support multiple keys for rotation when one gets rate-limited
+_all_keys = []
+if settings.gemini_api_keys:
+    _all_keys = [k.strip() for k in settings.gemini_api_keys.split(",") if k.strip()]
+if not _all_keys:
+    _single = settings.gemini_api_key or settings.google_api_key
+    if _single:
+        _all_keys = [_single]
+
+_current_key_idx = 0
+_api_key = _all_keys[0] if _all_keys else ""
+
 if _api_key and not os.environ.get("GOOGLE_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = _api_key
+
+
+def _rotate_key() -> str:
+    """Rotate to next API key when current one is rate-limited."""
+    global _current_key_idx, _api_key
+    if len(_all_keys) <= 1:
+        return _api_key
+    _current_key_idx = (_current_key_idx + 1) % len(_all_keys)
+    _api_key = _all_keys[_current_key_idx]
+    os.environ["GOOGLE_API_KEY"] = _api_key
+    logger.info("Rotated to API key #%d", _current_key_idx + 1)
+    return _api_key
 
 # ── Model fallback chain ──────────────────────────────────────────────────────
 # Only gemini-2.5-flash is confirmed available for this API key via ADK (v1beta).
@@ -141,6 +164,12 @@ async def _run_agent_once(
                     await asyncio.sleep(min(delay, 2.0))
                     continue
                 else:
+                    # Try rotating to a different API key before giving up
+                    if len(_all_keys) > 1:
+                        new_key = _rotate_key()
+                        logger.warning("All models exhausted on key, rotated to key #%d", _current_key_idx + 1)
+                        # Retry with first model on new key
+                        continue
                     logger.error("All models rate-limited. Last error: %s", exc)
                     raise
             else:
